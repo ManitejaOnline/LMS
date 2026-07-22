@@ -14,6 +14,7 @@
     "build:api": "npm run build -w @zebl/api",
     "build:web": "npm run build -w @zebl/web",
     "build:shared": "npm run build -w @zebl/shared",
+    "vercel-build": "npm run build:shared && npm run build:web",
     "lint": "npm run lint -w @zebl/api --if-present && npm run lint -w @zebl/web --if-present",
     "test:api": "npm run test -w @zebl/api --if-present",
     "prisma:generate": "npm run prisma:generate -w @zebl/api",
