@@ -16,20 +16,8 @@ async function bootstrap(): Promise<void> {
   const logger = app.get(Logger);
   app.useLogger(logger);
 
-  const storageRoot = configService.getOrThrow<string>('storage.rootDir');
-  const publicBase = configService.getOrThrow<string>('storage.publicBaseUrl');
-  const prefix = publicBase.endsWith('/') ? publicBase : `${publicBase}/`;
-  const assetsRoot = isAbsolute(storageRoot)
-    ? storageRoot
-    : join(process.cwd(), storageRoot);
-
-  app.useStaticAssets(assetsRoot, {
-    prefix,
-  });
-
-  const globalPrefix = configService.getOrThrow<string>('app.globalPrefix');
-  app.setGlobalPrefix(globalPrefix);
-
+  // CORS must run before static assets so /uploads responses include
+  // Access-Control-Allow-Origin (pdf.js / fetch from the web app).
   app.enableCors({
     origin: configService.getOrThrow<string[]>('app.corsOrigins'),
     credentials: true,
@@ -45,6 +33,33 @@ async function bootstrap(): Promise<void> {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
+
+  const storageRoot = configService.getOrThrow<string>('storage.rootDir');
+  const publicBase = configService.getOrThrow<string>('storage.publicBaseUrl');
+  const prefix = publicBase.endsWith('/') ? publicBase : `${publicBase}/`;
+  const assetsRoot = isAbsolute(storageRoot)
+    ? storageRoot
+    : join(process.cwd(), storageRoot);
+  const corsOrigins = configService.getOrThrow<string[]>('app.corsOrigins');
+
+  app.useStaticAssets(assetsRoot, {
+    prefix,
+    setHeaders: (res, _path, _stat) => {
+      const origin = res.req?.headers?.origin;
+      if (
+        typeof origin === 'string' &&
+        corsOrigins.includes(origin)
+      ) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+        res.setHeader('Vary', 'Origin');
+      }
+    },
+  });
+
+  const globalPrefix = configService.getOrThrow<string>('app.globalPrefix');
+  app.setGlobalPrefix(globalPrefix);
 
   app.useGlobalPipes(
     new ValidationPipe({
