@@ -30,7 +30,6 @@ import type {
   PlayerLessonDto,
   PlayerPayload,
 } from '../../core/models/domain.models';
-import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-course-player-page',
