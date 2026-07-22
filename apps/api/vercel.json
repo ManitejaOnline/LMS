@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm install --include=dev",
-  "buildCommand": "cd ../.. && npm run build:shared && npm run prisma:generate -w @zebl/api && npm run build -w @zebl/api",
+  "buildCommand": "cd ../.. && npm run build:shared && npm run prisma:generate -w @zebl/api && npm run prisma:migrate:deploy -w @zebl/api && npm run prisma:seed -w @zebl/api && npm run build -w @zebl/api",
   "outputDirectory": "dist"
 }
