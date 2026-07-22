@@ -46,13 +46,18 @@ export const authConfig = registerAs('auth', () => ({
     process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!SuperAdmin1',
 }));
 
-export const storageConfig = registerAs('storage', () => ({
-  rootDir: process.env.STORAGE_ROOT_DIR ?? 'uploads',
-  publicBaseUrl: process.env.STORAGE_PUBLIC_BASE_URL ?? '/uploads',
-  maxThumbnailBytes: Number(process.env.UPLOAD_MAX_THUMBNAIL_BYTES ?? 5_000_000),
-  maxDocumentBytes: Number(process.env.UPLOAD_MAX_DOCUMENT_BYTES ?? 50_000_000),
-  maxVideoBytes: Number(process.env.UPLOAD_MAX_VIDEO_BYTES ?? 500_000_000),
-}));
+export const storageConfig = registerAs('storage', () => {
+  const onVercel = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
+  return {
+    rootDir: onVercel
+      ? '/tmp/uploads'
+      : (process.env.STORAGE_ROOT_DIR ?? 'uploads'),
+    publicBaseUrl: process.env.STORAGE_PUBLIC_BASE_URL ?? '/uploads',
+    maxThumbnailBytes: Number(process.env.UPLOAD_MAX_THUMBNAIL_BYTES ?? 5_000_000),
+    maxDocumentBytes: Number(process.env.UPLOAD_MAX_DOCUMENT_BYTES ?? 50_000_000),
+    maxVideoBytes: Number(process.env.UPLOAD_MAX_VIDEO_BYTES ?? 500_000_000),
+  };
+});
 
 export type AppConfig = ConfigType<typeof appConfig>;
 export type DatabaseConfig = ConfigType<typeof databaseConfig>;

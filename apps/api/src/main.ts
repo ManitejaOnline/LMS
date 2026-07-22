@@ -1,26 +1,16 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
-import { join } from 'path';
+import { join, isAbsolute } from 'path';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter({
-      logger: false,
-      trustProxy: true,
-    }),
-    { bufferLogs: true },
-  );
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
 
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
@@ -28,17 +18,13 @@ async function bootstrap(): Promise<void> {
 
   const storageRoot = configService.getOrThrow<string>('storage.rootDir');
   const publicBase = configService.getOrThrow<string>('storage.publicBaseUrl');
+  const prefix = publicBase.endsWith('/') ? publicBase : `${publicBase}/`;
+  const assetsRoot = isAbsolute(storageRoot)
+    ? storageRoot
+    : join(process.cwd(), storageRoot);
 
-  await app.register(multipart, {
-    limits: {
-      fileSize: configService.getOrThrow<number>('storage.maxVideoBytes'),
-    },
-  });
-
-  await app.register(fastifyStatic, {
-    root: join(process.cwd(), storageRoot),
-    prefix: publicBase.endsWith('/') ? publicBase : `${publicBase}/`,
-    decorateReply: false,
+  app.useStaticAssets(assetsRoot, {
+    prefix,
   });
 
   const globalPrefix = configService.getOrThrow<string>('app.globalPrefix');

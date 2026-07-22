@@ -7,99 +7,88 @@ Internal enterprise HR onboarding / mandatory training portal (not a public cour
 | Layer | Technology |
 |---|---|
 | Frontend | Angular 20, Standalone, Signals, TailwindCSS, PrimeNG |
-| Backend | NestJS, Fastify, Prisma |
+| Backend | NestJS (Express), Prisma |
 | Database | PostgreSQL |
 | Auth | JWT + RBAC (`SUPER_ADMIN` · `ADMIN` · `MANAGER` · `EMPLOYEE`) |
 | Monorepo | npm workspaces |
 
 ## Quick start (local)
 
-### 1. Install
-
 ```bash
 npm install
 npm run build:shared
-```
-
-### 2. Configure PostgreSQL
-
-```bash
 docker compose up -d
-```
-
-Update `apps/api/.env` `DATABASE_URL`, then:
-
-```bash
+# configure apps/api/.env then:
 npm run prisma:generate
 npm run prisma:migrate -w @zebl/api
 npm run prisma:seed -w @zebl/api
-```
-
-Default seeded Super Admin:
-
-- Email: `superadmin@zebl.local`
-- Password: `ChangeMe!SuperAdmin1`
-
-### 3. Run
-
-```bash
 npm run dev:api
 npm run dev:web
 ```
 
-- API: http://localhost:3000/api/v1
-- Swagger: http://localhost:3000/docs
-- Web: http://localhost:4200
+- API: http://localhost:3000/api/v1  
+- Swagger: http://localhost:3000/docs  
+- Web: http://localhost:4200  
+
+Default admin: `superadmin@zebl.local` / `ChangeMe!SuperAdmin1`
 
 ---
 
-## Production deploy
+## Production on Vercel (frontend + backend)
 
-Vercel hosts the **frontend only**. The NestJS API must run on a long-lived Node host (Railway recommended). Postgres can be Railway Postgres, Neon, or Vercel Postgres — the API reads `DATABASE_URL`.
+Use **two Vercel projects** from the same GitHub repo. Vercel runs Nest as a [Fluid compute](https://vercel.com/docs/frameworks/backend/nestjs) function and the Angular app as static files.
 
 ```text
-Browser  →  Vercel (Angular SPA)
-Browser  →  Railway (Nest API)  →  Postgres
+Browser → Vercel Web  (Angular SPA)
+Browser → Vercel API  (NestJS) → Vercel Postgres / Neon
 ```
 
-### A. Deploy API on Railway
+### 1. Database
 
-1. Create a project at [railway.app](https://railway.app) and connect this GitHub repo.
-2. Add a **PostgreSQL** plugin; copy its `DATABASE_URL` into the API service.
-3. Create a service from the repo root (uses [`Dockerfile`](Dockerfile) + [`railway.toml`](railway.toml)).
-4. Set variables from [`apps/api/.env.production.example`](apps/api/.env.production.example), especially:
-   - `DATABASE_URL` (from Postgres plugin)
-   - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (long random strings, 32+ chars)
-   - `APP_CORS_ORIGINS=https://lms-api-ten.vercel.app` (your Vercel URL; comma-separate extras)
-5. Deploy. Note the public API URL, e.g. `https://zebl-lms-api.up.railway.app`.
-6. Confirm health: `GET https://YOUR-API-HOST/api/v1/health/live`
-7. Seed once (Railway shell or locally against prod DB):
+In Vercel (or Neon): create **Postgres**, copy `DATABASE_URL` (prefer the **pooled** connection string).
+
+Run migrations once from your machine:
 
 ```bash
 cd apps/api
-DATABASE_URL="postgresql://..." npx prisma db seed
+$env:DATABASE_URL="postgresql://..."
+npx prisma migrate deploy
+npx prisma db seed
 ```
 
-### B. Point the web app at the API
+### 2. API project
 
-Edit [`apps/web/src/environments/environment.prod.ts`](apps/web/src/environments/environment.prod.ts):
+1. [vercel.com/new](https://vercel.com/new) → import this repo → name it e.g. `lms-api`
+2. **Root Directory:** `apps/api`
+3. Framework: NestJS (auto from [`apps/api/vercel.json`](apps/api/vercel.json))
+4. Env vars from [`apps/api/.env.production.example`](apps/api/.env.production.example):
+   - `DATABASE_URL`
+   - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (32+ random chars)
+   - `APP_CORS_ORIGINS=https://YOUR-WEB-PROJECT.vercel.app`
+5. Deploy. Confirm: `GET https://YOUR-API.vercel.app/api/v1/health/live`
+
+### 3. Web project
+
+1. New Vercel project → same repo → name e.g. `lms-web`
+2. **Root Directory:** leave empty (repo root) — uses [`vercel.json`](vercel.json)
+3. Set API origin in [`apps/web/src/environments/environment.prod.ts`](apps/web/src/environments/environment.prod.ts):
 
 ```ts
-const API_ORIGIN = 'https://YOUR-API-HOST'; // Railway public URL, no trailing slash
+const API_ORIGIN = 'https://YOUR-API.vercel.app';
 ```
 
-Commit and push so Vercel rebuilds.
+4. Commit, push, redeploy web.
+5. Update API `APP_CORS_ORIGINS` to the web URL if it changed.
 
-### C. Deploy frontend on Vercel
+### Limits to know
 
-1. Import the same GitHub repo in Vercel.
-2. **Root Directory**: leave empty (repo root) — do **not** use `apps/api`.
-3. Build settings come from root [`vercel.json`](vercel.json) (builds `@zebl/shared` + `@zebl/web` only).
-4. Deploy. Login should POST to `https://YOUR-API-HOST/api/v1/auth/login`.
+- Uploads on Vercel go to ephemeral `/tmp` (not durable). For production media, plan S3/R2/Blob later.
+- Platform request body size limits apply (large videos may fail on Hobby).
+- Cold starts can make the first login after idle a bit slower.
 
-### Why not “everything on Vercel”?
+### Optional: Railway instead of Vercel API
 
-This API uses NestJS + Fastify, Prisma, disk uploads, and long learning timers. Vercel serverless is not a drop-in host for that stack. Hosting the SPA on Vercel and POSTing to the same origin without a Nest server produces **405** (static HTML rewrite).
+[`Dockerfile`](Dockerfile) + [`railway.toml`](railway.toml) remain supported if you prefer a long-running Node host for heavy uploads.
 
 ---
 
@@ -108,11 +97,3 @@ This API uses NestJS + Fastify, Prisma, disk uploads, and long learning timers. 
 - `@zebl/api` → `apps/api`
 - `@zebl/web` → `apps/web`
 - `@zebl/shared` → `packages/shared`
-
-## Documentation
-
-- [Phase 5 gate](docs/phase-05/PHASE_GATE.md)
-- [API (Phase 5)](docs/phase-05/API.md)
-- [Security & production](docs/phase-05/SECURITY_AND_PRODUCTION.md)
-- [Product Discovery](docs/phase-01/PRODUCT_DISCOVERY.md)
-- [Coding Standards](docs/foundation/CODING_STANDARDS.md)

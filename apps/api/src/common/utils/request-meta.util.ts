@@ -1,13 +1,21 @@
-import type { FastifyRequest } from 'fastify';
+import type { IncomingHttpHeaders } from 'http';
 
-export function extractClientMeta(request: FastifyRequest): {
+type ClientRequestLike = {
+  headers: IncomingHttpHeaders;
+  ip?: string;
+  socket?: { remoteAddress?: string | null };
+};
+
+export function extractClientMeta(request: ClientRequestLike): {
   ipAddress?: string;
   userAgent?: string;
 } {
   const forwarded = request.headers['x-forwarded-for'];
   const ipAddress =
     (typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : undefined) ||
-    request.ip;
+    request.ip ||
+    request.socket?.remoteAddress ||
+    undefined;
 
   const userAgentHeader = request.headers['user-agent'];
   const userAgent = Array.isArray(userAgentHeader)

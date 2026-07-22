@@ -12,7 +12,11 @@ import {
   Res,
   BadRequestException,
   UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
+  Body,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -22,7 +26,8 @@ import {
 } from '@nestjs/swagger';
 import { MediaKind } from '@prisma/client';
 import { AppRole } from '@zebl/shared';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { Request, Response } from 'express';
+import { memoryStorage } from 'multer';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -44,6 +49,12 @@ export class MediaController {
 
   @Post('upload')
   @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 500_000_000 },
+    }),
+  )
   @ApiOperation({ summary: 'Upload thumbnail, PDF document, or video' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -57,29 +68,16 @@ export class MediaController {
     },
   })
   async upload(
-    @Req() request: FastifyRequest,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('kind') kindRaw: string,
+    @Req() request: Request,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    let kind: MediaKind | undefined;
-    let fileBuffer: Buffer | undefined;
-    let originalName = 'upload.bin';
-    let mimeType = 'application/octet-stream';
-
-    const parts = request.parts();
-    for await (const part of parts) {
-      if (part.type === 'file') {
-        fileBuffer = await part.toBuffer();
-        originalName = part.filename || originalName;
-        mimeType = part.mimetype || mimeType;
-      } else if (part.type === 'field' && part.fieldname === 'kind') {
-        kind = String(part.value) as MediaKind;
-      }
-    }
-
-    if (!fileBuffer) {
+    if (!file?.buffer) {
       throw new BadRequestException('file is required');
     }
 
+    const kind = kindRaw as MediaKind;
     if (!kind || !Object.values(MediaKind).includes(kind)) {
       throw new BadRequestException(
         `kind is required and must be one of: ${Object.values(MediaKind).join(', ')}`,
@@ -88,9 +86,9 @@ export class MediaController {
 
     return this.mediaService.upload({
       kind,
-      originalName,
-      mimeType,
-      buffer: fileBuffer,
+      originalName: file.originalname || 'upload.bin',
+      mimeType: file.mimetype || 'application/octet-stream',
+      buffer: file.buffer,
       actor,
       meta: extractClientMeta(request),
     });
@@ -111,17 +109,13 @@ export class MediaController {
   async stream(
     @Param('mediaId') mediaId: string,
     @Query('access_token') accessToken: string | undefined,
-    @Req() request: FastifyRequest,
-    @Res() reply: FastifyReply,
+    @Req() request: Request,
+    @Res() reply: Response,
   ) {
     await this.requireAccessToken(request, accessToken);
 
     const media = await this.mediaService.requireMedia(mediaId);
-    const absolutePath = join(
-      process.cwd(),
-      this.storage.rootDir,
-      media.storagePath,
-    );
+    const absolutePath = join(this.storage.resolveRoot(), media.storagePath);
 
     if (!existsSync(absolutePath)) {
       throw new NotFoundException('Media file missing on disk');
@@ -129,9 +123,9 @@ export class MediaController {
 
     const stat = statSync(absolutePath);
     const range = request.headers.range;
-    reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Type', media.mimeType);
-    reply.header(
+    reply.setHeader('Accept-Ranges', 'bytes');
+    reply.setHeader('Content-Type', media.mimeType);
+    reply.setHeader(
       'Content-Disposition',
       `inline; filename="${encodeURIComponent(media.originalName)}"`,
     );
@@ -139,28 +133,30 @@ export class MediaController {
     if (range) {
       const match = /^bytes=(\d*)-(\d*)$/.exec(range);
       if (!match) {
-        reply.code(416);
-        return reply.send();
+        reply.status(416).end();
+        return;
       }
       const start = match[1] ? Number(match[1]) : 0;
       const end = match[2] ? Number(match[2]) : stat.size - 1;
       if (start >= stat.size || end >= stat.size || start > end) {
-        reply.code(416);
-        reply.header('Content-Range', `bytes */${stat.size}`);
-        return reply.send();
+        reply.status(416);
+        reply.setHeader('Content-Range', `bytes */${stat.size}`);
+        reply.end();
+        return;
       }
-      reply.code(206);
-      reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-      reply.header('Content-Length', end - start + 1);
-      return reply.send(createReadStream(absolutePath, { start, end }));
+      reply.status(206);
+      reply.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+      reply.setHeader('Content-Length', end - start + 1);
+      createReadStream(absolutePath, { start, end }).pipe(reply);
+      return;
     }
 
-    reply.header('Content-Length', stat.size);
-    return reply.send(createReadStream(absolutePath));
+    reply.setHeader('Content-Length', stat.size);
+    createReadStream(absolutePath).pipe(reply);
   }
 
   private async requireAccessToken(
-    request: FastifyRequest,
+    request: Request,
     queryToken?: string,
   ): Promise<void> {
     const header = request.headers.authorization;

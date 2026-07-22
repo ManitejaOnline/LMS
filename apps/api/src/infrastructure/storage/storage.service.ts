@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'fs/promises';
-import { join, extname } from 'path';
+import { join, extname, isAbsolute } from 'path';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MediaKind } from '@prisma/client';
@@ -15,6 +15,12 @@ export class StorageService {
 
   get publicBaseUrl(): string {
     return this.configService.getOrThrow<string>('storage.publicBaseUrl');
+  }
+
+  resolveRoot(): string {
+    return isAbsolute(this.rootDir)
+      ? this.rootDir
+      : join(process.cwd(), this.rootDir);
   }
 
   maxBytesForKind(kind: MediaKind): number {
@@ -46,7 +52,7 @@ export class StorageService {
     const folder = params.kind.toLowerCase();
     const fileName = `${randomUUID()}${extension}`;
     const relativePath = join(folder, fileName);
-    const absoluteDir = join(process.cwd(), this.rootDir, folder);
+    const absoluteDir = join(this.resolveRoot(), folder);
     const absolutePath = join(absoluteDir, fileName);
 
     await mkdir(absoluteDir, { recursive: true });

@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { FastifyRequest } from 'fastify';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { extractClientMeta } from '../../common/utils/request-meta.util';
@@ -21,14 +21,14 @@ export class AuthController {
   @Public()
   @Post('login')
   @ApiOperation({ summary: 'Authenticate and issue JWT tokens' })
-  login(@Body() dto: LoginDto, @Req() request: FastifyRequest) {
+  login(@Body() dto: LoginDto, @Req() request: Request) {
     return this.authService.login(dto, extractClientMeta(request));
   }
 
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Rotate refresh token and issue new access token' })
-  refresh(@Body() dto: RefreshTokenDto, @Req() request: FastifyRequest) {
+  refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
     return this.authService.refresh(
       dto.refreshToken,
       extractClientMeta(request),
@@ -40,7 +40,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Request password reset token' })
   forgotPassword(
     @Body() dto: ForgotPasswordDto,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.authService.forgotPassword(dto, extractClientMeta(request));
   }
@@ -50,7 +50,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password using token from forgot-password' })
   resetPassword(
     @Body() dto: ResetPasswordDto,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.authService.resetPassword(dto, extractClientMeta(request));
   }
@@ -61,7 +61,7 @@ export class AuthController {
   logout(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: LogoutDto,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.authService.logout(
       user,
@@ -76,7 +76,7 @@ export class AuthController {
   changePassword(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ChangePasswordDto,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.authService.changePassword(
       user,

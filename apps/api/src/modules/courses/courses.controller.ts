@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppRole } from '@zebl/shared';
-import type { FastifyRequest } from 'fastify';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { extractClientMeta } from '../../common/utils/request-meta.util';
@@ -59,7 +59,7 @@ export class CoursesController {
   create(
     @Body() dto: CreateCourseDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.createCourse(
       dto,
@@ -74,7 +74,7 @@ export class CoursesController {
     @Param('id') id: string,
     @Body() dto: UpdateCourseDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.updateCourse(
       id,
@@ -90,7 +90,7 @@ export class CoursesController {
     @Param('id') id: string,
     @Body() dto: UpdateCourseStatusDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.updateStatus(
       id,
@@ -105,7 +105,7 @@ export class CoursesController {
   remove(
     @Param('id') id: string,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.softDeleteCourse(
       id,
@@ -120,7 +120,7 @@ export class CoursesController {
     @Param('courseId') courseId: string,
     @Body() dto: CreateModuleDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.createModule(
       courseId,
@@ -136,7 +136,7 @@ export class CoursesController {
     @Param('moduleId') moduleId: string,
     @Body() dto: UpdateModuleDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.updateModule(
       moduleId,
@@ -152,7 +152,7 @@ export class CoursesController {
     @Param('courseId') courseId: string,
     @Body() dto: ReorderDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.reorderModules(
       courseId,
@@ -167,7 +167,7 @@ export class CoursesController {
   deleteModule(
     @Param('moduleId') moduleId: string,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.softDeleteModule(
       moduleId,
@@ -182,7 +182,7 @@ export class CoursesController {
     @Param('moduleId') moduleId: string,
     @Body() dto: CreateLessonDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.createLesson(
       moduleId,
@@ -198,7 +198,7 @@ export class CoursesController {
     @Param('lessonId') lessonId: string,
     @Body() dto: UpdateLessonDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.updateLesson(
       lessonId,
@@ -214,7 +214,7 @@ export class CoursesController {
     @Param('moduleId') moduleId: string,
     @Body() dto: ReorderDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.reorderLessons(
       moduleId,
@@ -229,7 +229,7 @@ export class CoursesController {
   deleteLesson(
     @Param('lessonId') lessonId: string,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.softDeleteLesson(
       lessonId,
@@ -244,7 +244,7 @@ export class CoursesController {
     @Param('courseId') courseId: string,
     @Body() dto: CreateAssignmentRuleDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.createAssignmentRule(
       courseId,
@@ -260,7 +260,7 @@ export class CoursesController {
     @Param('ruleId') ruleId: string,
     @Body() dto: UpdateAssignmentRuleDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.updateAssignmentRule(
       ruleId,
@@ -275,7 +275,7 @@ export class CoursesController {
   deleteRule(
     @Param('ruleId') ruleId: string,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.coursesService.softDeleteAssignmentRule(
       ruleId,

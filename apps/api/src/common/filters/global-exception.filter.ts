@@ -6,7 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { ApiErrorResponse } from '@zebl/shared';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 import { REQUEST_ID_HEADER } from '../constants/metadata.keys';
 
@@ -18,8 +18,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<FastifyReply>();
-    const request = ctx.getRequest<FastifyRequest>();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     const status = this.resolveStatus(exception);
     const { code, message, details } = this.resolveBody(exception);
@@ -49,7 +49,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       requestId,
     };
 
-    void response.status(status).send(body);
+    response.status(status).json(body);
   }
 
   private resolveStatus(exception: unknown): number {
@@ -109,7 +109,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return HttpStatus[status] ?? `HTTP_${status}`;
   }
 
-  private resolveRequestId(request: FastifyRequest): string | undefined {
+  private resolveRequestId(request: Request): string | undefined {
     const header = request.headers[REQUEST_ID_HEADER];
     if (typeof header === 'string') {
       return header;

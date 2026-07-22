@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppRole } from '@zebl/shared';
-import type { FastifyRequest } from 'fastify';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { extractClientMeta } from '../../common/utils/request-meta.util';
@@ -47,7 +47,7 @@ export class DepartmentsController {
   create(
     @Body() dto: CreateDepartmentDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.departmentsService.create(
       dto,
@@ -63,7 +63,7 @@ export class DepartmentsController {
     @Param('id') id: string,
     @Body() dto: UpdateDepartmentDto,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.departmentsService.update(
       id,
@@ -79,7 +79,7 @@ export class DepartmentsController {
   remove(
     @Param('id') id: string,
     @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: FastifyRequest,
+    @Req() request: Request,
   ) {
     return this.departmentsService.softDelete(
       id,

@@ -1,9 +1,10 @@
 /**
- * Production web config.
+ * Production web config — API is a separate Vercel Nest project.
  *
- * After deploying the Nest API on Railway (or Render), set API_ORIGIN to that
- * public origin — no trailing slash. Example:
- *   https://zebl-lms-api.up.railway.app
+ * Set API_ORIGIN to your API deployment URL (no trailing slash), e.g.:
+ *   https://lms-api-xxxxx.vercel.app
+ *
+ * Create that project with Root Directory = apps/api (see README).
  */
 const API_ORIGIN = 'https://YOUR-API-HOST';
 

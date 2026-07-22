@@ -5,7 +5,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import type { ApiSuccessResponse } from '@zebl/shared';
-import type { FastifyRequest } from 'fastify';
+import type { Request } from 'express';
 import { Observable, map } from 'rxjs';
 import { REQUEST_ID_HEADER } from '../constants/metadata.keys';
 
@@ -17,7 +17,7 @@ export class ResponseInterceptor<T>
     context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<ApiSuccessResponse<T>> {
-    const request = context.switchToHttp().getRequest<FastifyRequest>();
+    const request = context.switchToHttp().getRequest<Request>();
     const requestIdHeader = request.headers[REQUEST_ID_HEADER];
     const requestId = Array.isArray(requestIdHeader)
       ? requestIdHeader[0]
