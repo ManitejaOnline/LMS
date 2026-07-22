@@ -50,3 +50,5 @@ uploads/
 !apps/api/uploads/.gitkeep
 .turbo/
 .cache/
+.vercel
+.env*
