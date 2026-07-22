@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
+import { PrimeTemplate } from 'primeng/api';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
@@ -20,8 +21,6 @@ import type {
   UserStatus,
 } from '../../core/models/domain.models';
 
-const ADD_DEPARTMENT_VALUE = '__add_department__';
-
 @Component({
   selector: 'app-users-page',
   standalone: true,
@@ -38,6 +37,7 @@ const ADD_DEPARTMENT_VALUE = '__add_department__';
     Select,
     Tag,
     Message,
+    PrimeTemplate,
   ],
   template: `
     <div class="header-row">
@@ -81,8 +81,20 @@ const ADD_DEPARTMENT_VALUE = '__add_department__';
         [(ngModel)]="departmentId"
         placeholder="Department"
         [showClear]="true"
-        (onChange)="onFilterDepartmentChange($event)"
-      />
+        appendTo="body"
+        (onChange)="reload()"
+      >
+        <ng-template pTemplate="footer">
+          <button
+            type="button"
+            class="add-dept-btn"
+            (click)="openAddDepartment('filter')"
+          >
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            Add department
+          </button>
+        </ng-template>
+      </p-select>
     </section>
 
     @if (loading()) {
@@ -179,9 +191,21 @@ const ADD_DEPARTMENT_VALUE = '__add_department__';
             optionLabel="label"
             optionValue="value"
             formControlName="departmentId"
+            placeholder="Department"
             [showClear]="true"
-            (onChange)="onFormDepartmentChange($event)"
-          />
+            appendTo="body"
+          >
+            <ng-template pTemplate="footer">
+              <button
+                type="button"
+                class="add-dept-btn"
+                (click)="openAddDepartment('form')"
+              >
+                <i class="pi pi-plus" aria-hidden="true"></i>
+                Add department
+              </button>
+            </ng-template>
+          </p-select>
         </label>
         <label class="field">
           <span>Manager</span>
@@ -190,7 +214,9 @@ const ADD_DEPARTMENT_VALUE = '__add_department__';
             optionLabel="label"
             optionValue="value"
             formControlName="managerId"
+            placeholder="Manager"
             [showClear]="true"
+            appendTo="body"
           />
         </label>
         <div class="full actions">
@@ -280,6 +306,24 @@ const ADD_DEPARTMENT_VALUE = '__add_department__';
       .full {
         grid-column: 1 / -1;
       }
+      .add-dept-btn {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.4rem;
+        border: 0;
+        border-top: 1px solid var(--ctp-border);
+        background: transparent;
+        padding: 0.65rem 0.85rem;
+        color: var(--ctp-accent, var(--p-primary-color));
+        font: inherit;
+        font-size: var(--ctp-fs-label);
+        cursor: pointer;
+        text-align: left;
+      }
+      .add-dept-btn:hover {
+        background: var(--ctp-surface-muted, rgba(0, 0, 0, 0.04));
+      }
       @media (max-width: 900px) {
         .filters {
           grid-template-columns: 1fr;
@@ -358,28 +402,16 @@ export class UsersPageComponent implements OnInit {
     });
   }
 
-  departmentOptions() {
-    return [
-      ...this.departments().map((d) => ({ label: d.name, value: d.id })),
-      { label: '+ Add department', value: ADD_DEPARTMENT_VALUE },
-    ];
-  }
+  departmentOptions = computed(() =>
+    this.departments().map((d) => ({ label: d.name, value: d.id })),
+  );
 
-  onFilterDepartmentChange(event: { value: string | null }): void {
-    if (event.value === ADD_DEPARTMENT_VALUE) {
-      this.departmentId = null;
-      this.openAddDepartment('filter');
-      return;
-    }
-    this.reload();
-  }
-
-  onFormDepartmentChange(event: { value: string | null }): void {
-    if (event.value === ADD_DEPARTMENT_VALUE) {
-      this.form.patchValue({ departmentId: null });
-      this.openAddDepartment('form');
-    }
-  }
+  managerOptions = computed(() =>
+    this.managers().map((m) => ({
+      label: `${m.firstName} ${m.lastName}`,
+      value: m.id,
+    })),
+  );
 
   openAddDepartment(target: 'filter' | 'form'): void {
     this.deptCreateTarget = target;
@@ -419,13 +451,6 @@ export class UsersPageComponent implements OnInit {
           );
         },
       });
-  }
-
-  managerOptions() {
-    return this.managers().map((m) => ({
-      label: `${m.firstName} ${m.lastName}`,
-      value: m.id,
-    }));
   }
 
   reload(): void {
