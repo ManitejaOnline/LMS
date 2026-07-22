@@ -1,0 +1,26 @@
+{
+  "name": "zebl-lms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise Corporate Training Portal — monorepo foundation",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w @zebl/api",
+    "dev:web": "npm run start -w @zebl/web",
+    "build": "npm run build -w @zebl/shared && npm run build -w @zebl/api && npm run build -w @zebl/web",
+    "build:api": "npm run build -w @zebl/api",
+    "build:web": "npm run build -w @zebl/web",
+    "build:shared": "npm run build -w @zebl/shared",
+    "lint": "npm run lint -w @zebl/api --if-present && npm run lint -w @zebl/web --if-present",
+    "test:api": "npm run test -w @zebl/api --if-present",
+    "prisma:generate": "npm run prisma:generate -w @zebl/api",
+    "prisma:migrate": "npm run prisma:migrate -w @zebl/api",
+    "prisma:studio": "npm run prisma:studio -w @zebl/api"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

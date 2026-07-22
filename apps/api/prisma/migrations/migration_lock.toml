@@ -1,0 +1,4 @@
+# This file should contain the Prisma Migrate lock format version.
+# Do not edit manually.
+
+provider = "postgresql"
