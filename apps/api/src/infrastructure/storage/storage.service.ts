@@ -21,9 +21,11 @@ export class StorageService {
     return this.configService.getOrThrow<string>('storage.publicBaseUrl');
   }
 
-  /** Prefer Vercel Blob whenever a RW token is present (required on Vercel). */
+  /** Prefer Vercel Blob when a RW token or connected store id is present. */
   usesBlob(): boolean {
-    return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+    return Boolean(
+      process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
+    );
   }
 
   resolveRoot(): string {
@@ -64,9 +66,12 @@ export class StorageService {
     const relativePath = `${folder}/${fileName}`;
 
     if (this.usesBlob()) {
+      // Prefer explicit RW token when set; otherwise SDK uses OIDC
+      // (BLOB_STORE_ID + VERCEL_OIDC_TOKEN) on Vercel automatically.
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
       const blob = await put(relativePath, params.buffer, {
         access: 'public',
-        token: process.env.BLOB_READ_WRITE_TOKEN,
+        ...(token ? { token } : {}),
         contentType: params.mimeType,
         addRandomSuffix: false,
       });
@@ -81,7 +86,7 @@ export class StorageService {
       process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
     if (onVercel) {
       throw new ServiceUnavailableException(
-        'File storage is not configured. Set BLOB_READ_WRITE_TOKEN (Vercel Blob) for production uploads.',
+        'File storage is not configured. Connect a Vercel Blob store to this project (Storage → Blob → Connect Project), or set BLOB_READ_WRITE_TOKEN.',
       );
     }
 

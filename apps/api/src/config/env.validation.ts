@@ -52,6 +52,7 @@ export const envSchema = z.object({
   STORAGE_ROOT_DIR: z.string().min(1).default('uploads'),
   STORAGE_PUBLIC_BASE_URL: z.string().min(1).default('/uploads'),
   BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+  BLOB_STORE_ID: z.string().min(1).optional(),
   UPLOAD_MAX_THUMBNAIL_BYTES: z.coerce.number().int().positive().default(5_000_000),
   UPLOAD_MAX_DOCUMENT_BYTES: z.coerce.number().int().positive().default(50_000_000),
   UPLOAD_MAX_VIDEO_BYTES: z.coerce.number().int().positive().default(500_000_000),
