@@ -13,6 +13,14 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_NAME: z.string().min(1).default('zebl-lms-api'),
   APP_PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((value) => {
+      if (value === undefined || value === '') return undefined;
+      const n = typeof value === 'number' ? value : Number(value);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    }),
   APP_GLOBAL_PREFIX: z.string().min(1).default('api/v1'),
   APP_CORS_ORIGINS: z.string().default('http://localhost:4200'),
 

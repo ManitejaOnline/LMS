@@ -4,7 +4,8 @@ import { registerAs } from '@nestjs/config';
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   name: process.env.APP_NAME ?? 'zebl-lms-api',
-  port: Number(process.env.APP_PORT ?? 3000),
+  // Railway/Render set PORT; local/dev uses APP_PORT
+  port: Number(process.env.PORT ?? process.env.APP_PORT ?? 3000),
   globalPrefix: process.env.APP_GLOBAL_PREFIX ?? 'api/v1',
   corsOrigins: (process.env.APP_CORS_ORIGINS ?? 'http://localhost:4200')
     .split(',')
