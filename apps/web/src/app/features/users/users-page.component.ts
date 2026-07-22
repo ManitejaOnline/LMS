@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
+import { Textarea } from 'primeng/textarea';
 import { Select } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { Tag } from 'primeng/tag';
@@ -19,6 +20,8 @@ import type {
   UserStatus,
 } from '../../core/models/domain.models';
 
+const ADD_DEPARTMENT_VALUE = '__add_department__';
+
 @Component({
   selector: 'app-users-page',
   standalone: true,
@@ -31,6 +34,7 @@ import type {
     Button,
     Dialog,
     InputText,
+    Textarea,
     Select,
     Tag,
     Message,
@@ -77,7 +81,7 @@ import type {
         [(ngModel)]="departmentId"
         placeholder="Department"
         [showClear]="true"
-        (onChange)="reload()"
+        (onChange)="onFilterDepartmentChange($event)"
       />
     </section>
 
@@ -176,6 +180,7 @@ import type {
             optionValue="value"
             formControlName="departmentId"
             [showClear]="true"
+            (onChange)="onFormDepartmentChange($event)"
           />
         </label>
         <label class="field">
@@ -191,6 +196,44 @@ import type {
         <div class="full actions">
           <p-button type="button" label="Cancel" severity="secondary" [text]="true" (onClick)="dialogVisible = false" />
           <p-button type="submit" label="Save" [loading]="saving()" [disabled]="form.invalid || saving()" />
+        </div>
+      </form>
+    </p-dialog>
+
+    <p-dialog
+      [(visible)]="deptDialogVisible"
+      header="Add department"
+      [modal]="true"
+      [style]="{ width: '440px' }"
+      appendTo="body"
+    >
+      <form class="dept-form" [formGroup]="deptForm" (ngSubmit)="saveDepartment()">
+        <label class="field">
+          <span>Name</span>
+          <input pInputText formControlName="name" />
+        </label>
+        <label class="field">
+          <span>Code</span>
+          <input pInputText formControlName="code" />
+        </label>
+        <label class="field">
+          <span>Description</span>
+          <textarea pTextarea rows="3" formControlName="description"></textarea>
+        </label>
+        <div class="actions">
+          <p-button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            [text]="true"
+            (onClick)="deptDialogVisible = false"
+          />
+          <p-button
+            type="submit"
+            label="Save department"
+            [loading]="deptSaving()"
+            [disabled]="deptForm.invalid || deptSaving()"
+          />
         </div>
       </form>
     </p-dialog>
@@ -225,6 +268,10 @@ import type {
         grid-template-columns: 1fr 1fr;
         gap: var(--s3);
       }
+      .dept-form {
+        display: grid;
+        gap: var(--s3);
+      }
       .field {
         display: grid;
         gap: 4px;
@@ -254,6 +301,7 @@ export class UsersPageComponent implements OnInit {
   readonly managers = signal<UserDto[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
+  readonly deptSaving = signal(false);
   readonly error = signal<string | null>(null);
   readonly total = signal(0);
 
@@ -264,6 +312,9 @@ export class UsersPageComponent implements OnInit {
   status: UserStatus | null = null;
   departmentId: string | null = null;
   dialogVisible = false;
+  deptDialogVisible = false;
+  /** Where to assign the new department after create. */
+  private deptCreateTarget: 'filter' | 'form' = 'form';
   editingId: string | null = null;
 
   readonly roleOptions = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE'];
@@ -282,10 +333,14 @@ export class UsersPageComponent implements OnInit {
     managerId: [null as string | null],
   });
 
+  readonly deptForm = this.fb.nonNullable.group({
+    name: ['', [Validators.required, Validators.minLength(2)]],
+    code: ['', [Validators.required, Validators.minLength(2)]],
+    description: [''],
+  });
+
   ngOnInit(): void {
-    this.departmentsApi.list({ page: 1, pageSize: 100 }).subscribe({
-      next: (res) => this.departments.set(res.items),
-    });
+    this.loadDepartments();
     this.usersApi.list({ page: 1, pageSize: 100 }).subscribe({
       next: (res) =>
         this.managers.set(
@@ -297,8 +352,73 @@ export class UsersPageComponent implements OnInit {
     this.reload();
   }
 
+  private loadDepartments(): void {
+    this.departmentsApi.list({ page: 1, pageSize: 100 }).subscribe({
+      next: (res) => this.departments.set(res.items),
+    });
+  }
+
   departmentOptions() {
-    return this.departments().map((d) => ({ label: d.name, value: d.id }));
+    return [
+      ...this.departments().map((d) => ({ label: d.name, value: d.id })),
+      { label: '+ Add department', value: ADD_DEPARTMENT_VALUE },
+    ];
+  }
+
+  onFilterDepartmentChange(event: { value: string | null }): void {
+    if (event.value === ADD_DEPARTMENT_VALUE) {
+      this.departmentId = null;
+      this.openAddDepartment('filter');
+      return;
+    }
+    this.reload();
+  }
+
+  onFormDepartmentChange(event: { value: string | null }): void {
+    if (event.value === ADD_DEPARTMENT_VALUE) {
+      this.form.patchValue({ departmentId: null });
+      this.openAddDepartment('form');
+    }
+  }
+
+  openAddDepartment(target: 'filter' | 'form'): void {
+    this.deptCreateTarget = target;
+    this.deptForm.reset({ name: '', code: '', description: '' });
+    this.deptDialogVisible = true;
+  }
+
+  saveDepartment(): void {
+    if (this.deptForm.invalid) return;
+    this.deptSaving.set(true);
+    this.error.set(null);
+    const raw = this.deptForm.getRawValue();
+    this.departmentsApi
+      .create({
+        name: raw.name,
+        code: raw.code.toUpperCase(),
+        description: raw.description || undefined,
+      })
+      .subscribe({
+        next: (created) => {
+          this.departments.update((list) =>
+            [...list, created].sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          this.deptSaving.set(false);
+          this.deptDialogVisible = false;
+          if (this.deptCreateTarget === 'form') {
+            this.form.patchValue({ departmentId: created.id });
+          } else {
+            this.departmentId = created.id;
+            this.reload();
+          }
+        },
+        error: (err) => {
+          this.deptSaving.set(false);
+          this.error.set(
+            err?.error?.error?.message ?? 'Failed to create department',
+          );
+        },
+      });
   }
 
   managerOptions() {
