@@ -115,6 +115,13 @@ export class MediaController {
     await this.requireAccessToken(request, accessToken);
 
     const media = await this.mediaService.requireMedia(mediaId);
+
+    // Durable object storage (Vercel Blob) — redirect after auth check.
+    if (this.storage.isRemoteUrl(media.publicUrl)) {
+      reply.redirect(media.publicUrl);
+      return;
+    }
+
     const absolutePath = join(this.storage.resolveRoot(), media.storagePath);
 
     if (!existsSync(absolutePath)) {

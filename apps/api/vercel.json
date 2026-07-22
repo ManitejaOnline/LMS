@@ -3,5 +3,32 @@
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm install --include=dev",
   "buildCommand": "cd ../.. && npm run build:shared && npm run prisma:generate -w @zebl/api && npm run prisma:migrate:deploy -w @zebl/api && npm run prisma:seed -w @zebl/api && npm run build -w @zebl/api",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/uploads/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://lms-web-eosin-nine.vercel.app"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,HEAD,OPTIONS"
+        },
+        {
+          "key": "Access-Control-Expose-Headers",
+          "value": "Content-Disposition"
+        },
+        {
+          "key": "Vary",
+          "value": "Origin"
+        }
+      ]
+    }
+  ]
 }

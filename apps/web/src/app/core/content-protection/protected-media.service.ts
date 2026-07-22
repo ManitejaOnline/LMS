@@ -22,4 +22,22 @@ export class ProtectedMediaService {
     const base = `${environment.apiBaseUrl}/media/${media.id}/stream`;
     return `${base}?access_token=${encodeURIComponent(token)}`;
   }
+
+  /**
+   * Prefer durable absolute URLs (Vercel Blob); otherwise authenticated stream;
+   * fall back to mediaBaseUrl + relative /uploads path.
+   */
+  resolveMediaUrl(media: MediaAssetDto | null | undefined): string | null {
+    if (!media) return null;
+    const publicUrl = media.publicUrl;
+    if (publicUrl?.startsWith('http://') || publicUrl?.startsWith('https://')) {
+      return publicUrl;
+    }
+    const streamed = this.learningStreamUrl(media);
+    if (streamed) return streamed;
+    if (!publicUrl) return null;
+    return publicUrl.startsWith('http')
+      ? publicUrl
+      : `${environment.mediaBaseUrl}${publicUrl}`;
+  }
 }

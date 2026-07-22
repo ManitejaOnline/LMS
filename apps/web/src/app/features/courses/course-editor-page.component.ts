@@ -21,6 +21,7 @@ import { CoursesApiService } from '../../core/http/courses-api.service';
 import { LearningApiService } from '../../core/http/learning-api.service';
 import { DepartmentsApiService } from '../../core/http/departments-api.service';
 import { UsersApiService } from '../../core/http/users-api.service';
+import { ProtectedMediaService } from '../../core/content-protection/protected-media.service';
 import type {
   CourseDto,
   CourseModuleDto,
@@ -1105,6 +1106,7 @@ export class CourseEditorPageComponent implements OnInit {
   private readonly learningApi = inject(LearningApiService);
   private readonly departmentsApi = inject(DepartmentsApiService);
   private readonly usersApi = inject(UsersApiService);
+  private readonly protectedMedia = inject(ProtectedMediaService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -1331,9 +1333,7 @@ export class CourseEditorPageComponent implements OnInit {
   }
 
   pdfPreviewUrl(): string | null {
-    const media = this.pdfMedia();
-    if (!media?.publicUrl) return null;
-    return this.mediaUrl(media.publicUrl);
+    return this.protectedMedia.resolveMediaUrl(this.pdfMedia());
   }
 
   flatLessons(): LessonDto[] {
@@ -1577,7 +1577,7 @@ export class CourseEditorPageComponent implements OnInit {
       const mediaId = requireMediaAssetId(media);
       this.pdfMedia.set(media);
 
-      const url = this.mediaUrl(media.publicUrl);
+      const url = this.protectedMedia.resolveMediaUrl(media);
       if (!url) {
         throw new Error('Upload response missing media URL — aborting lesson creation');
       }

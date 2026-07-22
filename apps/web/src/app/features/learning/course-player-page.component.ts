@@ -977,12 +977,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   }
 
   mediaUrl(lesson: PlayerLessonDto): string | null {
-    const streamed = this.protectedMedia.learningStreamUrl(lesson.contentMedia);
-    if (streamed) return streamed;
-    // Fallback only if token missing (should not happen while authenticated)
-    const url = lesson.contentMedia?.publicUrl;
-    if (!url) return null;
-    return url.startsWith('http') ? url : `${environment.mediaBaseUrl}${url}`;
+    return this.protectedMedia.resolveMediaUrl(lesson.contentMedia);
   }
 
   onViewerFullscreen(active: boolean): void {

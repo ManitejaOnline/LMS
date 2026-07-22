@@ -44,6 +44,7 @@ export class MediaService {
       kind: params.kind,
       originalName: params.originalName,
       buffer: params.buffer,
+      mimeType: params.mimeType,
     });
 
     const media = await this.prisma.mediaAsset.create({

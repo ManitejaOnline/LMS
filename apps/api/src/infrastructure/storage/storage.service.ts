@@ -1,8 +1,12 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join, extname, isAbsolute } from 'path';
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MediaKind } from '@prisma/client';
+import { put } from '@vercel/blob';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -15,6 +19,11 @@ export class StorageService {
 
   get publicBaseUrl(): string {
     return this.configService.getOrThrow<string>('storage.publicBaseUrl');
+  }
+
+  /** Prefer Vercel Blob whenever a RW token is present (required on Vercel). */
+  usesBlob(): boolean {
+    return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   }
 
   resolveRoot(): string {
@@ -47,11 +56,35 @@ export class StorageService {
     kind: MediaKind;
     originalName: string;
     buffer: Buffer;
+    mimeType?: string;
   }): Promise<{ storagePath: string; publicUrl: string; absolutePath: string }> {
     const extension = extname(params.originalName) || this.fallbackExt(params.kind);
     const folder = params.kind.toLowerCase();
     const fileName = `${randomUUID()}${extension}`;
-    const relativePath = join(folder, fileName);
+    const relativePath = `${folder}/${fileName}`;
+
+    if (this.usesBlob()) {
+      const blob = await put(relativePath, params.buffer, {
+        access: 'public',
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        contentType: params.mimeType,
+        addRandomSuffix: false,
+      });
+      return {
+        storagePath: relativePath,
+        publicUrl: blob.url,
+        absolutePath: blob.url,
+      };
+    }
+
+    const onVercel =
+      process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
+    if (onVercel) {
+      throw new ServiceUnavailableException(
+        'File storage is not configured. Set BLOB_READ_WRITE_TOKEN (Vercel Blob) for production uploads.',
+      );
+    }
+
     const absoluteDir = join(this.resolveRoot(), folder);
     const absolutePath = join(absoluteDir, fileName);
 
@@ -64,10 +97,14 @@ export class StorageService {
     );
 
     return {
-      storagePath: relativePath.replace(/\\/g, '/'),
+      storagePath: relativePath,
       publicUrl,
       absolutePath,
     };
+  }
+
+  isRemoteUrl(url: string | null | undefined): boolean {
+    return !!url && /^https?:\/\//i.test(url);
   }
 
   private fallbackExt(kind: MediaKind): string {
