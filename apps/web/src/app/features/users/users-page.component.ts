@@ -1,7 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { PrimeTemplate } from 'primeng/api';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
@@ -37,7 +36,6 @@ import type {
     Select,
     Tag,
     Message,
-    PrimeTemplate,
   ],
   template: `
     <div class="header-row">
@@ -81,20 +79,16 @@ import type {
         [(ngModel)]="departmentId"
         placeholder="Department"
         [showClear]="true"
-        appendTo="body"
         (onChange)="reload()"
+      />
+      <button
+        type="button"
+        class="add-dept-link"
+        (click)="openAddDepartment('filter')"
       >
-        <ng-template pTemplate="footer">
-          <button
-            type="button"
-            class="add-dept-btn"
-            (click)="openAddDepartment('filter')"
-          >
-            <i class="pi pi-plus" aria-hidden="true"></i>
-            Add department
-          </button>
-        </ng-template>
-      </p-select>
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        Add department
+      </button>
     </section>
 
     @if (loading()) {
@@ -147,6 +141,7 @@ import type {
       [(visible)]="dialogVisible"
       [header]="editingId ? 'Edit user' : 'Add user'"
       [modal]="true"
+      [focusTrap]="false"
       [style]="{ width: '560px' }"
     >
       <form class="form-grid" [formGroup]="form" (ngSubmit)="save()">
@@ -176,15 +171,23 @@ import type {
           <span>Phone</span>
           <input pInputText formControlName="phone" />
         </label>
-        <label class="field">
+        <div class="field">
           <span>Role</span>
-          <p-select [options]="roleOptions" formControlName="role" />
-        </label>
-        <label class="field">
+          <p-select
+            [options]="roleOptions"
+            formControlName="role"
+            appendTo="body"
+          />
+        </div>
+        <div class="field">
           <span>Status</span>
-          <p-select [options]="statusOptions" formControlName="status" />
-        </label>
-        <label class="field">
+          <p-select
+            [options]="statusOptions"
+            formControlName="status"
+            appendTo="body"
+          />
+        </div>
+        <div class="field">
           <span>Department</span>
           <p-select
             [options]="departmentOptions()"
@@ -194,20 +197,17 @@ import type {
             placeholder="Department"
             [showClear]="true"
             appendTo="body"
+          />
+          <button
+            type="button"
+            class="add-dept-link"
+            (click)="openAddDepartment('form')"
           >
-            <ng-template pTemplate="footer">
-              <button
-                type="button"
-                class="add-dept-btn"
-                (click)="openAddDepartment('form')"
-              >
-                <i class="pi pi-plus" aria-hidden="true"></i>
-                Add department
-              </button>
-            </ng-template>
-          </p-select>
-        </label>
-        <label class="field">
+            <i class="pi pi-plus" aria-hidden="true"></i>
+            Add department
+          </button>
+        </div>
+        <div class="field">
           <span>Manager</span>
           <p-select
             [options]="managerOptions()"
@@ -218,7 +218,7 @@ import type {
             [showClear]="true"
             appendTo="body"
           />
-        </label>
+        </div>
         <div class="full actions">
           <p-button type="button" label="Cancel" severity="secondary" [text]="true" (onClick)="dialogVisible = false" />
           <p-button type="submit" label="Save" [loading]="saving()" [disabled]="form.invalid || saving()" />
@@ -280,9 +280,10 @@ import type {
       }
       .filters {
         display: grid;
-        grid-template-columns: 2fr repeat(3, 1fr);
+        grid-template-columns: 2fr repeat(3, 1fr) auto;
         gap: var(--s2);
         margin-bottom: var(--ctp-section-gap);
+        align-items: center;
       }
       .actions {
         display: flex;
@@ -306,23 +307,21 @@ import type {
       .full {
         grid-column: 1 / -1;
       }
-      .add-dept-btn {
-        display: flex;
-        width: 100%;
+      .add-dept-link {
+        display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.35rem;
         border: 0;
-        border-top: 1px solid var(--ctp-border);
         background: transparent;
-        padding: 0.65rem 0.85rem;
+        padding: 0.15rem 0;
         color: var(--ctp-accent, var(--p-primary-color));
         font: inherit;
         font-size: var(--ctp-fs-label);
         cursor: pointer;
-        text-align: left;
+        white-space: nowrap;
       }
-      .add-dept-btn:hover {
-        background: var(--ctp-surface-muted, rgba(0, 0, 0, 0.04));
+      .add-dept-link:hover {
+        text-decoration: underline;
       }
       @media (max-width: 900px) {
         .filters {
