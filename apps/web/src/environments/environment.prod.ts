@@ -1,7 +1,7 @@
 /**
  * Production web config — Nest API on Vercel project `lms-api`.
  */
-const API_ORIGIN = 'https://lms-api-ten.vercel.app';
+const API_ORIGIN = 'https://zebl-lms.vercel.app';
 
 export const environment = {
   production: true,
