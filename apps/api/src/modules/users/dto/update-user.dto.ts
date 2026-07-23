@@ -5,10 +5,11 @@ import {
   IsEnum,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+import { IsEntityId } from '../../../common/decorators/is-entity-id.decorator';
 
 export class UpdateUserDto {
   @ApiPropertyOptional()
@@ -52,13 +53,15 @@ export class UpdateUserDto {
   @IsEnum(UserStatus)
   status?: UserStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @IsUUID()
+  @ValidateIf((_, value) => value != null)
+  @IsEntityId()
   departmentId?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @IsUUID()
+  @ValidateIf((_, value) => value != null)
+  @IsEntityId()
   managerId?: string | null;
 }

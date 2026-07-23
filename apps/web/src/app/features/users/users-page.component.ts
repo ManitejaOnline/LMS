@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
-import { Textarea } from 'primeng/textarea';
 import { Select } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { Tag } from 'primeng/tag';
@@ -32,7 +31,6 @@ import type {
     Button,
     Dialog,
     InputText,
-    Textarea,
     Select,
     Tag,
     Message,
@@ -81,14 +79,6 @@ import type {
         [showClear]="true"
         (onChange)="reload()"
       />
-      <button
-        type="button"
-        class="add-dept-link"
-        (click)="openAddDepartment('filter')"
-      >
-        <i class="pi pi-plus" aria-hidden="true"></i>
-        Add department
-      </button>
     </section>
 
     @if (loading()) {
@@ -198,14 +188,6 @@ import type {
             [showClear]="true"
             appendTo="body"
           />
-          <button
-            type="button"
-            class="add-dept-link"
-            (click)="openAddDepartment('form')"
-          >
-            <i class="pi pi-plus" aria-hidden="true"></i>
-            Add department
-          </button>
         </div>
         <div class="field">
           <span>Manager</span>
@@ -222,44 +204,6 @@ import type {
         <div class="full actions">
           <p-button type="button" label="Cancel" severity="secondary" [text]="true" (onClick)="dialogVisible = false" />
           <p-button type="submit" label="Save" [loading]="saving()" [disabled]="form.invalid || saving()" />
-        </div>
-      </form>
-    </p-dialog>
-
-    <p-dialog
-      [(visible)]="deptDialogVisible"
-      header="Add department"
-      [modal]="true"
-      [style]="{ width: '440px' }"
-      appendTo="body"
-    >
-      <form class="dept-form" [formGroup]="deptForm" (ngSubmit)="saveDepartment()">
-        <label class="field">
-          <span>Name</span>
-          <input pInputText formControlName="name" />
-        </label>
-        <label class="field">
-          <span>Code</span>
-          <input pInputText formControlName="code" />
-        </label>
-        <label class="field">
-          <span>Description</span>
-          <textarea pTextarea rows="3" formControlName="description"></textarea>
-        </label>
-        <div class="actions">
-          <p-button
-            type="button"
-            label="Cancel"
-            severity="secondary"
-            [text]="true"
-            (onClick)="deptDialogVisible = false"
-          />
-          <p-button
-            type="submit"
-            label="Save department"
-            [loading]="deptSaving()"
-            [disabled]="deptForm.invalid || deptSaving()"
-          />
         </div>
       </form>
     </p-dialog>
@@ -280,10 +224,9 @@ import type {
       }
       .filters {
         display: grid;
-        grid-template-columns: 2fr repeat(3, 1fr) auto;
+        grid-template-columns: 2fr repeat(3, 1fr);
         gap: var(--s2);
         margin-bottom: var(--ctp-section-gap);
-        align-items: center;
       }
       .actions {
         display: flex;
@@ -295,10 +238,6 @@ import type {
         grid-template-columns: 1fr 1fr;
         gap: var(--s3);
       }
-      .dept-form {
-        display: grid;
-        gap: var(--s3);
-      }
       .field {
         display: grid;
         gap: 4px;
@@ -306,22 +245,6 @@ import type {
       }
       .full {
         grid-column: 1 / -1;
-      }
-      .add-dept-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        border: 0;
-        background: transparent;
-        padding: 0.15rem 0;
-        color: var(--ctp-accent, var(--p-primary-color));
-        font: inherit;
-        font-size: var(--ctp-fs-label);
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .add-dept-link:hover {
-        text-decoration: underline;
       }
       @media (max-width: 900px) {
         .filters {
@@ -344,7 +267,6 @@ export class UsersPageComponent implements OnInit {
   readonly managers = signal<UserDto[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly deptSaving = signal(false);
   readonly error = signal<string | null>(null);
   readonly total = signal(0);
 
@@ -355,9 +277,6 @@ export class UsersPageComponent implements OnInit {
   status: UserStatus | null = null;
   departmentId: string | null = null;
   dialogVisible = false;
-  deptDialogVisible = false;
-  /** Where to assign the new department after create. */
-  private deptCreateTarget: 'filter' | 'form' = 'form';
   editingId: string | null = null;
 
   readonly roleOptions = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE'];
@@ -376,14 +295,10 @@ export class UsersPageComponent implements OnInit {
     managerId: [null as string | null],
   });
 
-  readonly deptForm = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.minLength(2)]],
-    code: ['', [Validators.required, Validators.minLength(2)]],
-    description: [''],
-  });
-
   ngOnInit(): void {
-    this.loadDepartments();
+    this.departmentsApi.list({ page: 1, pageSize: 100 }).subscribe({
+      next: (res) => this.departments.set(res.items),
+    });
     this.usersApi.list({ page: 1, pageSize: 100 }).subscribe({
       next: (res) =>
         this.managers.set(
@@ -393,12 +308,6 @@ export class UsersPageComponent implements OnInit {
         ),
     });
     this.reload();
-  }
-
-  private loadDepartments(): void {
-    this.departmentsApi.list({ page: 1, pageSize: 100 }).subscribe({
-      next: (res) => this.departments.set(res.items),
-    });
   }
 
   departmentOptions = computed(() =>
@@ -411,46 +320,6 @@ export class UsersPageComponent implements OnInit {
       value: m.id,
     })),
   );
-
-  openAddDepartment(target: 'filter' | 'form'): void {
-    this.deptCreateTarget = target;
-    this.deptForm.reset({ name: '', code: '', description: '' });
-    this.deptDialogVisible = true;
-  }
-
-  saveDepartment(): void {
-    if (this.deptForm.invalid) return;
-    this.deptSaving.set(true);
-    this.error.set(null);
-    const raw = this.deptForm.getRawValue();
-    this.departmentsApi
-      .create({
-        name: raw.name,
-        code: raw.code.toUpperCase(),
-        description: raw.description || undefined,
-      })
-      .subscribe({
-        next: (created) => {
-          this.departments.update((list) =>
-            [...list, created].sort((a, b) => a.name.localeCompare(b.name)),
-          );
-          this.deptSaving.set(false);
-          this.deptDialogVisible = false;
-          if (this.deptCreateTarget === 'form') {
-            this.form.patchValue({ departmentId: created.id });
-          } else {
-            this.departmentId = created.id;
-            this.reload();
-          }
-        },
-        error: (err) => {
-          this.deptSaving.set(false);
-          this.error.set(
-            err?.error?.error?.message ?? 'Failed to create department',
-          );
-        },
-      });
-  }
 
   reload(): void {
     this.loading.set(true);
@@ -531,8 +400,8 @@ export class UsersPageComponent implements OnInit {
       phone: raw.phone || null,
       role: raw.role,
       status: raw.status,
-      departmentId: raw.departmentId,
-      managerId: raw.managerId,
+      departmentId: raw.departmentId || null,
+      managerId: raw.managerId || null,
     };
 
     const request = this.editingId

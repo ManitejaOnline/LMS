@@ -5,11 +5,12 @@ import {
   IsEnum,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+import { IsEntityId } from '../../../common/decorators/is-entity-id.decorator';
 
 export class CreateUserDto {
   @ApiProperty()
@@ -60,11 +61,13 @@ export class CreateUserDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUUID()
-  departmentId?: string;
+  @ValidateIf((_, value) => value != null)
+  @IsEntityId()
+  departmentId?: string | null;
 
   @ApiPropertyOptional({ description: 'Manager user id' })
   @IsOptional()
-  @IsUUID()
-  managerId?: string;
+  @ValidateIf((_, value) => value != null)
+  @IsEntityId()
+  managerId?: string | null;
 }
