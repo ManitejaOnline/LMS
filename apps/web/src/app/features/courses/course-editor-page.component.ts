@@ -4,19 +4,19 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Button } from 'primeng/button';
+import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
 import { Textarea } from 'primeng/textarea';
 import { Checkbox } from 'primeng/checkbox';
 import { RadioButton } from 'primeng/radiobutton';
 import { MultiSelect } from 'primeng/multiselect';
 import { Message } from 'primeng/message';
-import { Tag } from 'primeng/tag';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state/loading-state.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { UploadDialogComponent } from '../../shared/components/upload-dialog/upload-dialog.component';
-import { QuizBankEditorComponent } from '../../shared/components/quiz-bank-editor/quiz-bank-editor.component';
-import { PdfDocumentOrganizerComponent } from '../../shared/components/pdf-document-organizer/pdf-document-organizer.component';
+import { AssessmentEditorComponent } from '../../shared/components/assessment-editor/assessment-editor.component';
+import { QuizApiService } from '../../core/http/quiz-api.service';
 import { CoursesApiService } from '../../core/http/courses-api.service';
 import { LearningApiService } from '../../core/http/learning-api.service';
 import { DepartmentsApiService } from '../../core/http/departments-api.service';
@@ -41,22 +41,13 @@ type AssignmentSummary = {
   notStarted: number;
 };
 import { environment } from '../../../environments/environment';
-import {
-  type ChapterDraft,
-  chapterConfig,
-  detectPdfPageCount,
-  estimateReadingMinutes,
-  newChapterClientId,
-  readChapterBounds,
-} from '../../shared/utils/pdf-meta.util';
+import { chapterConfig, detectPdfPageCount, readChapterBounds } from '../../shared/utils/pdf-meta.util';
 import { requireMediaAssetId } from '../../shared/utils/media-id.util';
+import { detectVideoDuration, formatBytes, formatDuration } from '../../shared/utils/video-meta.util';
 import { firstValueFrom } from 'rxjs';
 
 type AuthorStep = 'details' | 'content' | 'publish' | 'assign';
 type UploadTarget = 'thumbnail' | 'pdf' | 'video';
-
-/** Single content module so PDF / video / quiz can be interleaved. */
-const CONTENT_MODULE_TITLE = 'Document';
 
 @Component({
   selector: 'app-course-editor-page',
@@ -66,8 +57,8 @@ const CONTENT_MODULE_TITLE = 'Document';
     LoadingStateComponent,
     StatusBadgeComponent,
     UploadDialogComponent,
-    QuizBankEditorComponent,
-    PdfDocumentOrganizerComponent,
+    AssessmentEditorComponent,
+    Dialog,
     ReactiveFormsModule,
     FormsModule,
     RouterLink,
@@ -79,7 +70,6 @@ const CONTENT_MODULE_TITLE = 'Document';
     RadioButton,
     MultiSelect,
     Message,
-    Tag,
   ],
   template: `
     @if (loading()) {
@@ -189,17 +179,15 @@ const CONTENT_MODULE_TITLE = 'Document';
           <section class="panel content-panel">
             <div class="section-head">
               <div>
-                <h2 class="panel-title">Content</h2>
-                <p class="section-sub">
-                  Organize the PDF into chapters, then insert video or quiz lessons in the outline.
-                </p>
+                <h2 class="panel-title">Course content</h2>
+                <p class="section-sub">Add ordered PDF and video lessons. Drag to reorder.</p>
               </div>
               <div class="actions">
                 <p-button
-                  label="Upload PDF"
-                  icon="pi pi-file-pdf"
+                  label="Add Lesson"
+                  icon="pi pi-plus"
                   size="small"
-                  (onClick)="openUpload('DOCUMENT')"
+                  (onClick)="openLessonDialog()"
                 />
                 <p-button
                   label="Continue to Publish"
@@ -213,150 +201,63 @@ const CONTENT_MODULE_TITLE = 'Document';
               </div>
             </div>
 
-            <div class="content-grid">
-              <div class="pdf-col">
-                <app-pdf-document-organizer
-                  [src]="pdfPreviewUrl()"
-                  [chapters]="chapters()"
-                  (chaptersChange)="onChaptersChange($event)"
-                  (pageCountChange)="onPdfPageCount($event)"
-                  (busyChange)="organizerBusy.set($event)"
-                />
-                @if (syncingChapters() || finalizingPdf()) {
-                  <p class="sync-hint">
-                    <i class="pi pi-spin pi-spinner"></i>
-                    {{
-                      finalizingPdf()
-                        ? 'Finalizing PDF lesson…'
-                        : 'Saving chapters as lessons…'
-                    }}
-                  </p>
-                }
-              </div>
+            @if (outlineLessons().length === 0) {
+              <p class="muted empty-hint">No lessons yet. Click + Add Lesson to start the sequence.</p>
+            }
 
-              <div class="lessons-col">
-                <div class="subhead">
-                  <h3>Course outline</h3>
-                  <span class="meta">{{ outlineLessons().length }} lessons · live</span>
-                </div>
-
-                @if (outlineLessons().length === 0) {
-                  <p class="muted empty-hint">
-                    Upload a PDF and create chapters — they appear here as lessons automatically.
-                    Reorder is available after lessons exist.
-                  </p>
-                } @else if (outlineLessons().length === 1) {
-                  <p class="muted reorder-hint">Add another lesson to enable reordering.</p>
-                }
-
-                <div class="insert-row">
-                  <span class="insert-label">Insert at start</span>
-                  <button
-                    type="button"
-                    class="insert-btn"
-                    (click)="setInsertAt(0); openUpload('VIDEO')"
-                  >
-                    <i class="pi pi-video"></i> Video
-                  </button>
-                  <button
-                    type="button"
-                    class="insert-btn"
-                    [disabled]="creatingQuiz()"
-                    (click)="setInsertAt(0); addQuizLesson()"
-                  >
-                    <i class="pi pi-list-check"></i> Quiz
-                  </button>
-                </div>
-
-                <div
-                  class="outline-list"
-                  cdkDropList
-                  [cdkDropListData]="outlineLessons()"
-                  [cdkDropListDisabled]="outlineLessons().length < 2"
-                  (cdkDropListDropped)="onOutlineDrop($event)"
-                >
-                  @for (lesson of outlineLessons(); track lesson.id; let i = $index) {
-                    <div class="outline-item" cdkDrag [cdkDragDisabled]="outlineLessons().length < 2">
-                      <div class="lesson-row">
-                        <i
-                          class="pi pi-bars drag-handle"
-                          cdkDragHandle
-                          [class.disabled]="outlineLessons().length < 2"
-                        ></i>
-                        <div class="lesson-main">
-                          <div class="lesson-title-row">
-                            <span class="lesson-index">{{ i + 1 }}</span>
-                            <input
-                              class="lesson-title-input"
-                              [(ngModel)]="lesson.title"
-                              (change)="renameLesson(lesson)"
-                            />
-                          </div>
-                          <div class="lesson-meta">
-                            <p-tag [value]="lessonTypeLabel(lesson)" styleClass="text-xs" />
-                            @if (lesson.type === 'PDF') {
-                              @let bounds = chapterBounds(lesson);
-                              @if (bounds.pageStart != null && bounds.pageEnd != null) {
-                                <span>Pages {{ bounds.pageStart }}–{{ bounds.pageEnd }}</span>
-                                <span
-                                  >{{ bounds.pageEnd - bounds.pageStart + 1 }} pages</span
-                                >
-                                <span
-                                  >~{{
-                                    readingMins(bounds.pageStart, bounds.pageEnd)
-                                  }}
-                                  min</span
-                                >
-                              }
-                            } @else if (lesson.contentMedia) {
-                              <span class="muted">{{ lesson.contentMedia.originalName }}</span>
-                            } @else if (lesson.type === 'QUIZ') {
-                              <span class="muted">Question bank</span>
-                            } @else {
-                              <span class="warn">Media required</span>
-                            }
-                          </div>
+            <div
+              class="lesson-cards"
+              cdkDropList
+              [cdkDropListData]="outlineLessons()"
+              [cdkDropListDisabled]="outlineLessons().length < 2"
+              (cdkDropListDropped)="onOutlineDrop($event)"
+            >
+              @for (lesson of outlineLessons(); track lesson.id; let i = $index) {
+                <article class="lesson-card" cdkDrag [cdkDragDisabled]="outlineLessons().length < 2">
+                  <i class="pi pi-bars drag-handle" cdkDragHandle></i>
+                  <div class="lesson-card-body">
+                    <div class="lesson-card-title">
+                      <span class="lesson-index">{{ i + 1 }}</span>
+                      <strong>{{ lesson.title }}</strong>
+                    </div>
+                    <div class="lesson-meta">
+                      {{ lessonSummary(lesson) }}
+                    </div>
+                    <div class="lesson-card-actions">
+                      <p-button label="Edit" [text]="true" size="small" (onClick)="openLessonDialog(lesson)" />
+                      <p-button label="Preview" [text]="true" size="small" (onClick)="previewLesson(lesson)" />
+                      <p-button
+                        label="Delete"
+                        severity="danger"
+                        [text]="true"
+                        size="small"
+                        (onClick)="removeLesson(lesson)"
+                      />
+                    </div>
+                    <div class="assessment-block">
+                      @if (lesson.quiz) {
+                        <div class="assessment-meta">
+                          <strong>Assessment</strong>
+                          <span>{{ lesson.quiz._count?.questions ?? 0 }} questions · Pass {{ lesson.quiz.passingScore }}%</span>
                         </div>
-                        @if (lesson.type === 'QUIZ') {
-                          <p-button
-                            icon="pi pi-list-check"
-                            [text]="true"
-                            size="small"
-                            aria-label="Edit question bank"
-                            (onClick)="openQuizBank(lesson.id)"
-                          />
-                        }
+                        <div class="lesson-card-actions">
+                          <p-button label="Edit assessment" [text]="true" size="small" (onClick)="openAssessmentEditor(lesson)" />
+                          <p-button label="Preview" [text]="true" size="small" (onClick)="previewAssessment(lesson)" />
+                          <p-button label="Delete" severity="danger" [text]="true" size="small" (onClick)="deleteAssessment(lesson)" />
+                        </div>
+                      } @else {
                         <p-button
-                          icon="pi pi-trash"
-                          severity="danger"
+                          label="Add Assessment"
+                          icon="pi pi-plus"
                           [text]="true"
                           size="small"
-                          (onClick)="removeLesson(lesson)"
+                          (onClick)="openAssessmentEditor(lesson)"
                         />
-                      </div>
-
-                      <div class="insert-row nested">
-                        <span class="insert-label">Insert after</span>
-                        <button
-                          type="button"
-                          class="insert-btn"
-                          (click)="setInsertAt(i + 1); openUpload('VIDEO')"
-                        >
-                          <i class="pi pi-video"></i> Video
-                        </button>
-                        <button
-                          type="button"
-                          class="insert-btn"
-                          [disabled]="creatingQuiz()"
-                          (click)="setInsertAt(i + 1); addQuizLesson()"
-                        >
-                          <i class="pi pi-list-check"></i> Quiz
-                        </button>
-                      </div>
+                      }
                     </div>
-                  }
-                </div>
-              </div>
+                  </div>
+                </article>
+              }
             </div>
           </section>
         }
@@ -639,7 +540,69 @@ const CONTENT_MODULE_TITLE = 'Document';
       (uploaded)="onUploaded($event)"
     />
 
-    <app-quiz-bank-editor #quizBank />
+    <app-assessment-editor #assessmentEditor (saved)="onAssessmentSaved()" />
+
+    <p-dialog
+      header="{{ editingLessonId ? 'Edit lesson' : 'Add lesson' }}"
+      [(visible)]="lessonDialogVisible"
+      [modal]="true"
+      [focusTrap]="false"
+      appendTo="body"
+      [style]="{ width: 'min(520px, 94vw)' }"
+    >
+      <form class="lesson-form" [formGroup]="lessonForm" (ngSubmit)="saveLesson()">
+        <label class="field">
+          <span>Lesson title</span>
+          <input pInputText formControlName="title" />
+        </label>
+        <label class="field">
+          <span>Lesson description</span>
+          <textarea pTextarea rows="3" formControlName="description"></textarea>
+        </label>
+        <fieldset class="lesson-type">
+          <legend>Lesson type</legend>
+          <label>
+            <p-radioButton name="lessonType" value="PDF" formControlName="type" [disabled]="!!editingLessonId" />
+            PDF
+          </label>
+          <label>
+            <p-radioButton name="lessonType" value="VIDEO" formControlName="type" [disabled]="!!editingLessonId" />
+            Video
+          </label>
+        </fieldset>
+        <div class="field">
+          <span>{{ lessonForm.value.type === 'VIDEO' ? 'Video file' : 'PDF file' }}</span>
+          <p-button
+            type="button"
+            [label]="lessonForm.value.type === 'VIDEO' ? 'Upload video' : 'Upload PDF'"
+            severity="secondary"
+            [outlined]="true"
+            size="small"
+            (onClick)="openUpload(lessonForm.value.type === 'VIDEO' ? 'VIDEO' : 'DOCUMENT')"
+          />
+          @if (lessonMedia()) {
+            <small class="muted">{{ lessonMedia()!.originalName }} · {{ formatBytes(lessonMedia()!.sizeBytes) }}</small>
+          }
+          @if (lessonPageCount()) {
+            <small>{{ lessonPageCount() }} pages detected</small>
+          }
+          @if (lessonDuration()) {
+            <small>{{ formatDuration(lessonDuration()) }}</small>
+          }
+        </div>
+        @if (lessonPreviewUrl()) {
+          @if (lessonForm.value.type === 'VIDEO') {
+            <video class="lesson-preview" [src]="lessonPreviewUrl()!" controls></video>
+          } @else {
+            <a class="preview-link" [href]="lessonPreviewUrl()!" target="_blank" rel="noopener">Open PDF preview</a>
+          }
+        }
+        <div class="actions">
+          <p-button type="button" label="Cancel" severity="secondary" [text]="true" (onClick)="lessonDialogVisible = false" />
+          <p-button type="submit" label="Save lesson" [loading]="savingLesson()" [disabled]="lessonForm.invalid || !lessonMedia() || savingLesson()" />
+        </div>
+      </form>
+    </p-dialog>
   `,
   styles: [
     `
@@ -1086,6 +1049,66 @@ const CONTENT_MODULE_TITLE = 'Document';
       .cdk-drag-preview {
         box-shadow: var(--ctp-shadow);
       }
+      .lesson-cards {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .lesson-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.75rem;
+        align-items: start;
+        padding: 0.9rem 1rem;
+        border: 1px solid var(--ctp-border);
+        border-radius: var(--ctp-radius);
+        background: var(--ctp-bg);
+      }
+      .lesson-card-title {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+      }
+      .lesson-card-actions {
+        display: flex;
+        gap: 0.25rem;
+        margin-top: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .assessment-block {
+        margin-top: 0.7rem;
+        padding-top: 0.65rem;
+        border-top: 1px solid var(--ctp-border);
+      }
+      .assessment-meta {
+        display: grid;
+        gap: 0.15rem;
+        font-size: 0.86rem;
+      }
+      .assessment-meta span { color: var(--ctp-muted); }
+      .lesson-form,
+      .lesson-type {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .lesson-type {
+        border: 0;
+        padding: 0;
+      }
+      .lesson-type label {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+        margin-right: 1rem;
+      }
+      .lesson-preview {
+        width: 100%;
+        max-height: 220px;
+        border-radius: 8px;
+        background: #111;
+      }
+      .preview-link {
+        font-size: 0.9rem;
+      }
       @media (max-width: 960px) {
         .steps,
         .content-grid,
@@ -1110,10 +1133,12 @@ export class CourseEditorPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
-  private readonly quizBank = viewChild.required<QuizBankEditorComponent>('quizBank');
+  private readonly quizApi = inject(QuizApiService);
+  private readonly assessmentEditor = viewChild(AssessmentEditorComponent);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
+  readonly savingLesson = signal(false);
   readonly error = signal<string | null>(null);
   readonly info = signal<string | null>(null);
   readonly course = signal<CourseDto | null>(null);
@@ -1125,29 +1150,32 @@ export class CourseEditorPageComponent implements OnInit {
   readonly departments = signal<DepartmentDto[]>([]);
   readonly employees = signal<UserDto[]>([]);
   readonly step = signal<AuthorStep>('details');
-  readonly pdfMedia = signal<MediaAssetDto | null>(null);
-  readonly pdfPageCount = signal<number | null>(null);
-  readonly chapters = signal<ChapterDraft[]>([]);
-  readonly syncingChapters = signal(false);
-  readonly finalizingPdf = signal(false);
-  readonly organizerBusy = signal(false);
   readonly assigning = signal(false);
-  readonly creatingQuiz = signal(false);
   readonly publishing = signal(false);
+  lessonDialogVisible = false;
+  editingLessonId: string | null = null;
+  readonly lessonMedia = signal<MediaAssetDto | null>(null);
+  readonly lessonPageCount = signal<number | null>(null);
+  readonly lessonDuration = signal<number | null>(null);
+  readonly lessonPreviewUrl = signal<string | null>(null);
 
-  /** Index in outline where the next video/quiz should be inserted. */
-  private insertAt: number | null = null;
-  private chapterSyncTimer: ReturnType<typeof setTimeout> | null = null;
-  private chapterSyncGeneration = 0;
-  private suppressChapterSync = false;
   private uploadTarget: UploadTarget = 'thumbnail';
 
   readonly stepMeta: { id: AuthorStep; label: string; hint: string }[] = [
     { id: 'details', label: 'Details', hint: 'Title, code, thumbnail' },
-    { id: 'content', label: 'Content', hint: 'PDF chapters, video, quiz' },
+    { id: 'content', label: 'Content', hint: 'PDF and video lessons' },
     { id: 'publish', label: 'Publish', hint: 'Readiness and release' },
     { id: 'assign', label: 'Assign', hint: 'Learners and due date' },
   ];
+
+  readonly lessonForm = this.fb.nonNullable.group({
+    title: ['', [Validators.required, Validators.minLength(2)]],
+    description: [''],
+    type: ['PDF' as 'PDF' | 'VIDEO'],
+  });
+
+  readonly formatBytes = formatBytes;
+  readonly formatDuration = formatDuration;
 
   readonly roleOptions = [
     { label: 'Employee', value: 'EMPLOYEE' },
@@ -1193,9 +1221,6 @@ export class CourseEditorPageComponent implements OnInit {
         this.course.set(null);
         this.modules.set([]);
         this.assignStats.set(null);
-        this.pdfMedia.set(null);
-        this.pdfPageCount.set(null);
-        this.chapters.set([]);
         this.step.set('details');
         this.loading.set(false);
         return;
@@ -1332,46 +1357,12 @@ export class CourseEditorPageComponent implements OnInit {
     });
   }
 
-  pdfPreviewUrl(): string | null {
-    return this.protectedMedia.resolveMediaUrl(this.pdfMedia());
-  }
-
   flatLessons(): LessonDto[] {
     return this.modules().flatMap((m) => m.lessons ?? []);
   }
 
-  /** Flattened outline across content modules, preserving module then lesson order. */
   outlineLessons(): LessonDto[] {
     return this.flatLessons();
-  }
-
-  chapterBounds(lesson: LessonDto) {
-    return readChapterBounds(lesson.quizConfig);
-  }
-
-  readingMins(pageStart: number, pageEnd: number): number {
-    return estimateReadingMinutes(pageEnd - pageStart + 1);
-  }
-
-  lessonTypeLabel(lesson: LessonDto): string {
-    if (lesson.type === 'PDF') return 'PDF chapter';
-    if (lesson.type === 'VIDEO') return 'Video';
-    if (lesson.type === 'QUIZ') return 'Quiz';
-    return lesson.type;
-  }
-
-  setInsertAt(index: number): void {
-    this.insertAt = index;
-  }
-
-  onPdfPageCount(count: number): void {
-    this.pdfPageCount.set(count);
-  }
-
-  onChaptersChange(next: ChapterDraft[]): void {
-    this.chapters.set(next);
-    if (this.suppressChapterSync) return;
-    this.scheduleChapterSync();
   }
 
   applyCourse(course: CourseDto): void {
@@ -1391,7 +1382,6 @@ export class CourseEditorPageComponent implements OnInit {
         ? this.mediaUrl(course.thumbnailMedia.publicUrl)
         : null,
     );
-    this.hydratePdfFromCourse(course);
     if (course.status === 'PUBLISHED') {
       this.loadAssignStats();
     } else {
@@ -1481,18 +1471,10 @@ export class CourseEditorPageComponent implements OnInit {
 
   readiness(): { label: string; ok: boolean; hint?: string }[] {
     const course = this.course();
-    const lessons = this.flatLessons();
+    const lessons = this.flatLessons().filter((l) => l.type === 'PDF' || l.type === 'VIDEO');
     const title = (course?.title ?? this.courseForm.value.title ?? '').trim();
     const code = (course?.code ?? this.courseForm.value.code ?? '').trim();
-    const pdfLessons = lessons.filter((l) => l.type === 'PDF');
-    const mediaLessons = lessons.filter((l) => l.type === 'PDF' || l.type === 'VIDEO');
-    const mediaOk = mediaLessons.every((l) => !!l.contentMediaId);
-    const brokenMedia = mediaLessons.some(
-      (l) => !!l.contentMediaId && !l.contentMedia,
-    );
-    const pdfValid =
-      pdfLessons.length > 0 &&
-      pdfLessons.every((l) => !!l.contentMediaId && !!l.contentMedia);
+    const mediaOk = lessons.every((l) => !!l.contentMediaId && !!l.contentMedia);
     const formOk = this.courseForm.valid || !!course;
 
     return [
@@ -1512,24 +1494,19 @@ export class CourseEditorPageComponent implements OnInit {
         hint: 'Fix validation errors on the Details step and save.',
       },
       {
-        label: 'At least one lesson',
+        label: 'At least one PDF or video lesson',
         ok: lessons.length > 0,
-        hint: 'Upload a PDF or add video/quiz lessons on the Content step.',
+        hint: 'Add a PDF or video lesson on the Content step.',
       },
       {
-        label: 'Uploaded PDF is valid',
-        ok: pdfValid,
-        hint: 'Upload a PDF document so at least one PDF lesson has attached media.',
+        label: 'Lesson media attached',
+        ok: lessons.length > 0 && mediaOk,
+        hint: 'Every PDF and video lesson must have uploaded content.',
       },
       {
-        label: 'Media lessons have content attached',
-        ok: mediaLessons.length === 0 ? false : mediaOk,
-        hint: 'Every PDF and video lesson must reference uploaded media.',
-      },
-      {
-        label: 'No broken lesson media references',
-        ok: !brokenMedia && mediaOk && lessons.length > 0,
-        hint: 'Re-upload media for any lesson that shows a broken file reference.',
+        label: 'Assessments published',
+        ok: lessons.every((l) => !l.quiz || l.quiz.status === 'PUBLISHED'),
+        hint: 'Publish each lesson assessment, or delete draft assessments.',
       },
     ];
   }
@@ -1549,507 +1526,177 @@ export class CourseEditorPageComponent implements OnInit {
       this.info.set('Thumbnail uploaded — save course details to persist');
       return;
     }
+    void this.attachLessonMedia(media);
+  }
 
-    if (this.uploadTarget === 'pdf') {
-      void this.finalizePdfUpload(media);
+  openLessonDialog(lesson?: LessonDto): void {
+    this.editingLessonId = lesson?.id ?? null;
+    this.lessonForm.reset({
+      title: lesson?.title ?? '',
+      description: lesson?.description ?? '',
+      type: lesson?.type === 'VIDEO' ? 'VIDEO' : 'PDF',
+    });
+    this.lessonMedia.set(lesson?.contentMedia ?? null);
+    const bounds = lesson ? readChapterBounds(lesson.quizConfig) : { pageStart: null, pageEnd: null };
+    this.lessonPageCount.set(
+      bounds.pageStart && bounds.pageEnd ? bounds.pageEnd - bounds.pageStart + 1 : null,
+    );
+    this.lessonDuration.set(lesson?.durationSeconds ?? null);
+    this.lessonPreviewUrl.set(
+      lesson?.contentMedia ? this.protectedMedia.resolveMediaUrl(lesson.contentMedia) : null,
+    );
+    this.lessonDialogVisible = true;
+  }
+
+  lessonSummary(lesson: LessonDto): string {
+    if (lesson.type === 'PDF') {
+      const bounds = readChapterBounds(lesson.quizConfig);
+      const pages =
+        bounds.pageStart && bounds.pageEnd
+          ? bounds.pageEnd - bounds.pageStart + 1
+          : null;
+      return pages ? `PDF · ${pages} pages` : 'PDF';
+    }
+    if (lesson.type === 'VIDEO') {
+      return `Video · ${formatDuration(lesson.durationSeconds)}`;
+    }
+    return lesson.type;
+  }
+
+  previewLesson(lesson: LessonDto): void {
+    const url = this.protectedMedia.resolveMediaUrl(lesson.contentMedia);
+    if (!url) {
+      this.error.set('No media attached to preview');
       return;
     }
+    window.open(url, '_blank', 'noopener');
+  }
 
-    if (this.uploadTarget === 'video') {
-      void this.createVideoLesson(media);
+  private async attachLessonMedia(media: MediaAssetDto): Promise<void> {
+    try {
+      requireMediaAssetId(media);
+      this.lessonMedia.set(media);
+      const url = this.protectedMedia.resolveMediaUrl(media);
+      this.lessonPreviewUrl.set(url);
+      if (this.lessonForm.value.type === 'PDF' && url) {
+        const pages = await detectPdfPageCount(url);
+        this.lessonPageCount.set(pages);
+        if (!this.lessonForm.value.title) {
+          this.lessonForm.patchValue({
+            title: (media.originalName || 'Lesson').replace(/\.pdf$/i, ''),
+          });
+        }
+      }
+      if (this.lessonForm.value.type === 'VIDEO' && url) {
+        const duration = await detectVideoDuration(url);
+        this.lessonDuration.set(duration);
+        if (!this.lessonForm.value.title) {
+          this.lessonForm.patchValue({
+            title: (media.originalName || 'Lesson').replace(/\.(mp4|webm|mov)$/i, ''),
+          });
+        }
+      }
+    } catch (err) {
+      this.error.set((err as Error)?.message ?? 'Could not read uploaded media');
     }
   }
 
-  /**
-   * Complete PDF pipeline: media already stored → metadata → PDF lesson on module → refresh.
-   */
-  private async finalizePdfUpload(media: MediaAssetDto): Promise<void> {
-    if (!this.course()) {
-      this.error.set('Save the course before uploading a PDF');
-      return;
-    }
-
-    this.finalizingPdf.set(true);
+  async saveLesson(): Promise<void> {
+    const course = this.course();
+    const media = this.lessonMedia();
+    if (!course || this.lessonForm.invalid || !media) return;
+    this.savingLesson.set(true);
     this.error.set(null);
-    this.info.set(null);
-
     try {
+      const raw = this.lessonForm.getRawValue();
       const mediaId = requireMediaAssetId(media);
-      this.pdfMedia.set(media);
-
-      const url = this.protectedMedia.resolveMediaUrl(media);
-      if (!url) {
-        throw new Error('Upload response missing media URL — aborting lesson creation');
-      }
-
-      const pageCount = await detectPdfPageCount(url);
-      if (!Number.isFinite(pageCount) || pageCount < 1) {
-        throw new Error('PDF metadata extraction failed — no pages found');
-      }
-      this.pdfPageCount.set(pageCount);
-
-      const mod = await this.ensureContentModule();
-
-      // Replace prior PDF document lessons so re-upload keeps a single media-bound lesson set
-      const existingPdf = (mod.lessons ?? []).filter((l) => l.type === 'PDF');
-      for (const lesson of existingPdf) {
-        await firstValueFrom(this.api.deleteLesson(lesson.id));
-      }
-
-      const title =
-        (media.originalName || 'Course document').replace(/\.pdf$/i, '').trim() ||
-        'Course document';
-
-      const lessonBody = {
-        title,
-        type: 'PDF' as const,
+      const body: Record<string, unknown> = {
+        title: raw.title.trim(),
+        description: raw.description.trim() || null,
+        type: raw.type,
         contentMediaId: mediaId,
-        quizConfig: chapterConfig(1, pageCount),
+        durationSeconds: raw.type === 'VIDEO' ? this.lessonDuration() : null,
+        quizConfig:
+          raw.type === 'PDF' && this.lessonPageCount()
+            ? chapterConfig(1, this.lessonPageCount()!)
+            : null,
+        status: 'PUBLISHED',
       };
-
-      const lesson = await firstValueFrom(this.api.createLesson(mod.id, lessonBody));
-
-      if (!lesson?.id) {
-        throw new Error('Lesson creation failed — no lesson returned');
+      if (this.editingLessonId) {
+        await firstValueFrom(this.api.updateLesson(this.editingLessonId, body));
+      } else {
+        await firstValueFrom(this.api.createCourseLesson(course.id, body));
       }
-
-      this.suppressChapterSync = true;
-      this.chapters.set([
-        {
-          clientId: newChapterClientId(),
-          lessonId: lesson.id,
-          title,
-          pageStart: 1,
-          pageEnd: pageCount,
-        },
-      ]);
-      this.suppressChapterSync = false;
-
+      this.lessonDialogVisible = false;
       await this.reloadCourseAsync();
-
-      const refreshed = this.flatLessons().find((l) => l.id === lesson.id);
-      if (!refreshed || refreshed.type !== 'PDF' || !refreshed.contentMediaId) {
-        throw new Error('Course refresh did not return the new PDF lesson with media');
-      }
-
-      this.info.set(
-        `PDF ready — ${pageCount} pages · lesson “${title}” created. Split or adjust chapters as needed.`,
-      );
+      this.info.set(this.editingLessonId ? 'Lesson updated' : 'Lesson added');
     } catch (err: unknown) {
-      const message =
+      this.error.set(
         (err as { error?: { error?: { message?: string } }; message?: string })?.error?.error
           ?.message ??
-        (err as { message?: string })?.message ??
-        'Failed to finalize PDF upload';
-      this.error.set(message);
-    } finally {
-      this.finalizingPdf.set(false);
-    }
-  }
-
-  async addQuizLesson(): Promise<void> {
-    if (!this.course()) return;
-    this.creatingQuiz.set(true);
-    this.error.set(null);
-    try {
-      const mod = await this.ensureContentModule();
-      const sortOrder = this.resolveInsertSortOrder(mod);
-      const lesson = await firstValueFrom(
-        this.api.createLesson(mod.id, {
-          title: 'Knowledge check',
-          type: 'QUIZ',
-          sortOrder,
-        }),
+          (err as { message?: string })?.message ??
+          'Failed to save lesson',
       );
-      await this.placeLessonAtInsert(mod.id, lesson.id);
-      await this.reloadCourseAsync();
-      this.openQuizBank(lesson.id);
-      this.info.set('Quiz lesson created');
-    } catch (err: unknown) {
-      const message =
-        (err as { error?: { error?: { message?: string } } })?.error?.error?.message ??
-        'Failed to create quiz lesson';
-      this.error.set(message);
     } finally {
-      this.creatingQuiz.set(false);
-      this.insertAt = null;
+      this.savingLesson.set(false);
     }
-  }
-
-  openQuizBank(lessonId: string): void {
-    this.quizBank().open(lessonId);
-  }
-
-  renameLesson(lesson: LessonDto): void {
-    this.api.updateLesson(lesson.id, { title: lesson.title }).subscribe({
-      next: () => {
-        // Keep chapter draft titles in sync for PDF chapters
-        const bounds = readChapterBounds(lesson.quizConfig);
-        if (bounds.pageStart != null) {
-          this.suppressChapterSync = true;
-          this.chapters.set(
-            this.chapters().map((c) =>
-              c.lessonId === lesson.id ? { ...c, title: lesson.title } : c,
-            ),
-          );
-          this.suppressChapterSync = false;
-        }
-      },
-      error: (err) => this.error.set(err?.error?.error?.message ?? 'Rename failed'),
-    });
   }
 
   onOutlineDrop(event: CdkDragDrop<LessonDto[]>): void {
     const lessons = [...this.outlineLessons()];
-    if (lessons.length === 0) {
-      this.info.set('No lessons to reorder yet. Create chapters or lessons first.');
-      return;
-    }
     if (lessons.length < 2 || event.previousIndex === event.currentIndex) {
       return;
     }
     moveItemInArray(lessons, event.previousIndex, event.currentIndex);
-    const mod = this.contentModule();
-    if (!mod) return;
-    mod.lessons = lessons.filter((l) =>
-      (mod.lessons ?? []).some((x) => x.id === l.id),
-    );
     void this.reorderAllOutline(lessons);
+  }
+
+  onAssessmentSaved(): void {
+    this.reloadCourse();
+  }
+
+  openAssessmentEditor(lesson: LessonDto): void {
+    this.assessmentEditor()?.open(lesson.id);
+  }
+
+  previewAssessment(lesson: LessonDto): void {
+    this.assessmentEditor()?.open(lesson.id, { preview: true });
+  }
+
+  deleteAssessment(lesson: LessonDto): void {
+    if (!lesson.quiz || !confirm(`Delete assessment for "${lesson.title}"?`)) return;
+    this.quizApi.deleteAssessment(lesson.quiz.id).subscribe({
+      next: () => this.reloadCourse(),
+      error: (err) => this.error.set(err?.error?.error?.message ?? 'Could not delete assessment'),
+    });
   }
 
   removeLesson(lesson: LessonDto): void {
     if (!confirm(`Delete lesson "${lesson.title}"?`)) return;
     this.api.deleteLesson(lesson.id).subscribe({
-      next: () => {
-        if (lesson.type === 'PDF') {
-          this.suppressChapterSync = true;
-          this.chapters.set(this.chapters().filter((c) => c.lessonId !== lesson.id));
-          this.suppressChapterSync = false;
-        }
-        this.reloadCourse();
-      },
+      next: () => this.reloadCourse(),
       error: (err) => this.error.set(err?.error?.error?.message ?? 'Delete failed'),
     });
   }
 
-  private scheduleChapterSync(): void {
-    if (this.chapterSyncTimer) clearTimeout(this.chapterSyncTimer);
-    this.chapterSyncTimer = setTimeout(() => {
-      void this.syncChaptersToLessons();
-    }, 450);
-  }
-
-  private async syncChaptersToLessons(): Promise<void> {
-    const course = this.course();
-    const media = this.pdfMedia();
-    const drafts = this.chapters();
-    if (!course || !media) return;
-
-    const gen = ++this.chapterSyncGeneration;
-    this.syncingChapters.set(true);
-    this.error.set(null);
-
-    try {
-      const mod = await this.ensureContentModule();
-      if (gen !== this.chapterSyncGeneration) return;
-
-      const existingPdf = (mod.lessons ?? []).filter((l) => {
-        if (l.type !== 'PDF') return false;
-        const b = readChapterBounds(l.quizConfig);
-        return b.pageStart != null && b.pageEnd != null;
-      });
-
-      const draftLessonIds = new Set(
-        drafts.map((d) => d.lessonId).filter((id): id is string => !!id),
-      );
-
-      for (const lesson of existingPdf) {
-        if (!draftLessonIds.has(lesson.id)) {
-          await firstValueFrom(this.api.deleteLesson(lesson.id));
-        }
-      }
-      if (gen !== this.chapterSyncGeneration) return;
-
-      const mediaId = requireMediaAssetId(media);
-      const updatedDrafts: ChapterDraft[] = [];
-      for (const ch of drafts) {
-        const title = ch.title.trim() || `Pages ${ch.pageStart}–${ch.pageEnd}`;
-        const config = chapterConfig(ch.pageStart, ch.pageEnd);
-
-        if (ch.lessonId) {
-          await firstValueFrom(
-            this.api.updateLesson(ch.lessonId, {
-              title,
-              contentMediaId: mediaId,
-              quizConfig: config,
-            }),
-          );
-          updatedDrafts.push({ ...ch, title });
-        } else {
-          const created = await firstValueFrom(
-            this.api.createLesson(mod.id, {
-              title,
-              type: 'PDF',
-              contentMediaId: mediaId,
-              quizConfig: config,
-            }),
-          );
-          updatedDrafts.push({ ...ch, title, lessonId: created.id });
-        }
-      }
-      if (gen !== this.chapterSyncGeneration) return;
-
-      this.suppressChapterSync = true;
-      this.chapters.set(updatedDrafts);
-      this.suppressChapterSync = false;
-
-      // Reorder only after lessons exist and chapter order may need applying
-      if (updatedDrafts.length > 0) {
-        await this.reorderAfterChapterSync(mod.id, updatedDrafts);
-      }
-      await this.reloadCourseAsync();
-      if (gen === this.chapterSyncGeneration) {
-        this.info.set(
-          updatedDrafts.length
-            ? `${updatedDrafts.length} chapter lesson(s) saved`
-            : 'Chapters cleared',
-        );
-      }
-    } catch (err: unknown) {
-      if (gen !== this.chapterSyncGeneration) return;
-      const message =
-        (err as { error?: { error?: { message?: string } } })?.error?.error?.message ??
-        'Failed to save chapters';
-      this.error.set(message);
-    } finally {
-      if (gen === this.chapterSyncGeneration) {
-        this.syncingChapters.set(false);
-      }
-    }
-  }
-
-  /**
-   * Keep non-PDF lessons in place while ordering PDF chapter lessons to match drafts.
-   */
-  private async reorderAfterChapterSync(
-    moduleId: string,
-    drafts: ChapterDraft[],
-  ): Promise<void> {
-    if (drafts.length === 0) return;
-
-    await this.reloadCourseAsync();
-    const mod = this.modules().find((m) => m.id === moduleId);
-    if (!mod) return;
-
-    const lessons = [...(mod.lessons ?? [])];
-    if (lessons.length === 0) return;
-
-    const pdfIds = new Set(
-      drafts.map((d) => d.lessonId).filter((id): id is string => !!id),
-    );
-    const pdfOrdered = drafts
-      .map((d) => lessons.find((l) => l.id === d.lessonId))
-      .filter((l): l is LessonDto => !!l);
-
-    // If creates/updates failed, do not reorder an incomplete set
-    if (pdfOrdered.length !== drafts.length) return;
-
-    const pdfQueue = [...pdfOrdered];
-    const rebuilt: LessonDto[] = [];
-    for (const lesson of lessons) {
-      if (pdfIds.has(lesson.id)) {
-        const nextPdf = pdfQueue.shift();
-        if (nextPdf && !rebuilt.some((x) => x.id === nextPdf.id)) {
-          rebuilt.push(nextPdf);
-        }
-      } else {
-        rebuilt.push(lesson);
-      }
-    }
-    for (const leftover of pdfQueue) {
-      if (!rebuilt.some((x) => x.id === leftover.id)) rebuilt.push(leftover);
-    }
-
-    await this.safeReorderLessons(
-      moduleId,
-      lessons,
-      rebuilt.map((l) => ({ id: l.id })),
-    );
-  }
-
-  private async createVideoLesson(media: MediaAssetDto): Promise<void> {
-    if (!this.course()) return;
-    try {
-      const mediaId = requireMediaAssetId(media);
-      const mod = await this.ensureContentModule();
-      const sortOrder = this.resolveInsertSortOrder(mod);
-      const lesson = await firstValueFrom(
-        this.api.createLesson(mod.id, {
-          title: media.originalName || 'Video lesson',
-          type: 'VIDEO',
-          contentMediaId: mediaId,
-          sortOrder,
-        }),
-      );
-      await this.placeLessonAtInsert(mod.id, lesson.id);
-      this.info.set('Video lesson created');
-      await this.reloadCourseAsync();
-    } catch (err: unknown) {
-      const message =
-        (err as { error?: { error?: { message?: string } } })?.error?.error?.message ??
-        'Failed to create video lesson';
-      this.error.set(message);
-    } finally {
-      this.insertAt = null;
-    }
-  }
-
-  private resolveInsertSortOrder(mod: CourseModuleDto): number {
-    if (this.insertAt == null) {
-      return mod.lessons?.length ?? 0;
-    }
-    return this.insertAt;
-  }
-
-  private async placeLessonAtInsert(moduleId: string, lessonId: string): Promise<void> {
-    if (this.insertAt == null) return;
-    await this.reloadCourseAsync();
-    const mod = this.modules().find((m) => m.id === moduleId);
-    if (!mod?.lessons?.length) return;
-
-    const lessons = [...mod.lessons];
-    const from = lessons.findIndex((l) => l.id === lessonId);
-    if (from < 0) return;
-    const [item] = lessons.splice(from, 1);
-    const to = Math.min(Math.max(this.insertAt, 0), lessons.length);
-    lessons.splice(to, 0, item);
-
-    await this.safeReorderLessons(
-      moduleId,
-      mod.lessons,
-      lessons.map((l) => ({ id: l.id })),
-    );
-  }
-
   private async reorderAllOutline(ordered: LessonDto[]): Promise<void> {
-    const mod = await this.ensureContentModule();
-    const moduleLessons = mod.lessons ?? [];
-    if (moduleLessons.length === 0) {
-      this.info.set('No lessons to reorder yet. Create chapters or lessons first.');
-      return;
-    }
-
-    const ids = new Set(moduleLessons.map((l) => l.id));
-    const outline = ordered.filter((l) => ids.has(l.id));
-    const payload =
-      outline.length === moduleLessons.length && outline.length > 0
-        ? outline.map((l) => ({ id: l.id }))
-        : moduleLessons.map((l) => ({ id: l.id }));
-
+    const course = this.course();
+    if (!course || ordered.length < 2) return;
     try {
-      await this.safeReorderLessons(mod.id, moduleLessons, payload);
+      await firstValueFrom(
+        this.api.reorderCourseLessons(
+          course.id,
+          ordered.map((l) => ({ id: l.id })),
+        ),
+      );
       await this.reloadCourseAsync();
     } catch (err: unknown) {
-      const message =
+      this.error.set(
         (err as { error?: { error?: { message?: string } } })?.error?.error?.message ??
-        'Lesson reorder failed';
-      this.error.set(message);
+          'Lesson reorder failed',
+      );
       await this.reloadCourseAsync();
     }
-  }
-
-  /** Skip no-op / empty reorder requests; only POST when order actually changed. */
-  private async safeReorderLessons(
-    moduleId: string,
-    current: LessonDto[],
-    nextItems: { id: string }[],
-  ): Promise<void> {
-    if (nextItems.length === 0) {
-      this.info.set('No lessons to reorder yet. Create chapters or lessons first.');
-      return;
-    }
-    if (current.length === 0) {
-      this.info.set('No lessons to reorder yet. Create chapters or lessons first.');
-      return;
-    }
-    if (this.isSameLessonOrder(current, nextItems)) {
-      return;
-    }
-    await firstValueFrom(this.api.reorderLessons(moduleId, nextItems));
-  }
-
-  private isSameLessonOrder(
-    current: LessonDto[],
-    nextItems: { id: string }[],
-  ): boolean {
-    if (current.length !== nextItems.length) return false;
-    return current.every((lesson, index) => lesson.id === nextItems[index]?.id);
-  }
-
-  private contentModule(): CourseModuleDto | undefined {
-    return this.modules().find(
-      (m) => m.title.trim().toLowerCase() === CONTENT_MODULE_TITLE.toLowerCase(),
-    );
-  }
-
-  private async ensureContentModule(): Promise<CourseModuleDto> {
-    return this.ensureModule(CONTENT_MODULE_TITLE);
-  }
-
-  private async ensureModule(title: string): Promise<CourseModuleDto> {
-    const existing = this.modules().find(
-      (m) => m.title.trim().toLowerCase() === title.toLowerCase(),
-    );
-    if (existing) return existing;
-
-    const created = await firstValueFrom(
-      this.api.createModule(this.course()!.id, { title }),
-    );
-    await this.reloadCourseAsync();
-    const refreshed = this.modules().find((m) => m.id === created.id);
-    return refreshed ?? created;
-  }
-
-  private hydratePdfFromCourse(course: CourseDto): void {
-    const allLessons = (course.modules ?? []).flatMap((m) => m.lessons ?? []);
-    const pdfLessons = allLessons.filter((l) => l.type === 'PDF');
-    const withMedia = pdfLessons.find((l) => l.contentMedia);
-    if (withMedia?.contentMedia) {
-      this.pdfMedia.set(withMedia.contentMedia);
-    }
-
-    const chapterLessons = pdfLessons.filter((l) => {
-      const b = readChapterBounds(l.quizConfig);
-      return b.pageStart != null && b.pageEnd != null;
-    });
-
-    const prevByLesson = new Map(
-      this.chapters()
-        .filter((c) => c.lessonId)
-        .map((c) => [c.lessonId!, c] as const),
-    );
-
-    this.suppressChapterSync = true;
-    if (chapterLessons.length > 0) {
-      this.chapters.set(
-        chapterLessons.map((l) => {
-          const b = readChapterBounds(l.quizConfig);
-          const prev = prevByLesson.get(l.id);
-          return {
-            clientId: prev?.clientId ?? newChapterClientId(),
-            lessonId: l.id,
-            title: l.title,
-            pageStart: b.pageStart ?? 1,
-            pageEnd: b.pageEnd ?? 1,
-          };
-        }),
-      );
-      const maxEnd = Math.max(...this.chapters().map((c) => c.pageEnd));
-      if (maxEnd > 0 && !this.pdfPageCount()) this.pdfPageCount.set(maxEnd);
-    } else if (!this.pdfMedia()) {
-      this.chapters.set([]);
-    }
-    this.suppressChapterSync = false;
   }
 
   private reloadCourse(): void {

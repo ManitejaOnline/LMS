@@ -40,6 +40,13 @@ export const PRIMARY_NAV: NavItem[] = [
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
+    id: 'programs',
+    label: 'Learning Programs',
+    icon: 'pi pi-sitemap',
+    route: '/app/programs',
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+  {
     id: 'employees',
     label: 'Employees',
     icon: 'pi pi-users',

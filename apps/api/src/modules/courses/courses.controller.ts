@@ -48,6 +48,50 @@ export class CoursesController {
     return this.coursesService.listCourses(query);
   }
 
+  @Get(':courseId/lessons')
+  @ApiOperation({ summary: 'List ordered lessons for a course' })
+  listLessons(@Param('courseId') courseId: string) {
+    return this.coursesService.listCourseLessons(courseId);
+  }
+
+  @Post(':courseId/lessons')
+  @ApiOperation({ summary: 'Create a lesson on a course (uses primary content module)' })
+  createCourseLesson(
+    @Param('courseId') courseId: string,
+    @Body() dto: CreateLessonDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.coursesService.createCourseLesson(
+      courseId,
+      dto,
+      actor,
+      extractClientMeta(request),
+    );
+  }
+
+  @Post(':courseId/lessons/reorder')
+  @ApiOperation({ summary: 'Reorder all lessons in a course' })
+  reorderCourseLessons(
+    @Param('courseId') courseId: string,
+    @Body() dto: ReorderDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.coursesService.reorderCourseLessons(
+      courseId,
+      dto,
+      actor,
+      extractClientMeta(request),
+    );
+  }
+
+  @Get('lessons/:lessonId')
+  @ApiOperation({ summary: 'Get a single lesson' })
+  getLesson(@Param('lessonId') lessonId: string) {
+    return this.coursesService.getLesson(lessonId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get course detail with modules, lessons, rules' })
   get(@Param('id') id: string) {

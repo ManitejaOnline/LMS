@@ -10,6 +10,7 @@ import {
   LessonType,
   MediaKind,
   Prisma,
+  QuizStatus,
 } from '@prisma/client';
 import {
   buildPaginatedResult,
@@ -41,7 +42,23 @@ const courseDetailInclude = {
       lessons: {
         where: { deletedAt: null },
         orderBy: { sortOrder: 'asc' as const },
-        include: { contentMedia: true },
+        include: {
+          contentMedia: true,
+          quiz: {
+            where: { deletedAt: null },
+            select: {
+              id: true,
+              title: true,
+              passingScore: true,
+              maxAttempts: true,
+              status: true,
+              showCorrectAnswers: true,
+              _count: {
+                select: { questions: { where: { deletedAt: null } } },
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -374,6 +391,97 @@ export class CoursesService {
     return { id: moduleId, deleted: true };
   }
 
+  async listCourseLessons(courseId: string) {
+    await this.requireCourse(courseId);
+    const modules = await this.prisma.courseModule.findMany({
+      where: { courseId, deletedAt: null },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        lessons: {
+          where: { deletedAt: null },
+          orderBy: { sortOrder: 'asc' },
+          include: { contentMedia: true },
+        },
+      },
+    });
+    return modules.flatMap((mod, moduleIndex) =>
+      mod.lessons.map((lesson, lessonIndex) => ({
+        ...lesson,
+        courseId,
+        moduleTitle: mod.title,
+        sortOrder: modules
+          .slice(0, moduleIndex)
+          .reduce((sum, item) => sum + item.lessons.length, 0) + lessonIndex,
+      })),
+    );
+  }
+
+  async getLesson(lessonId: string) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, deletedAt: null },
+      include: {
+        contentMedia: true,
+        module: { select: { id: true, courseId: true, title: true } },
+      },
+    });
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found');
+    }
+    return lesson;
+  }
+
+  async createCourseLesson(
+    courseId: string,
+    dto: CreateLessonDto,
+    actor: AuthenticatedUser,
+    meta?: ClientMeta,
+  ) {
+    const module = await this.ensurePrimaryModule(courseId);
+    return this.createLesson(module.id, dto, actor, meta);
+  }
+
+  async reorderCourseLessons(
+    courseId: string,
+    dto: ReorderDto,
+    actor: AuthenticatedUser,
+    meta?: ClientMeta,
+  ) {
+    await this.requireCourse(courseId);
+    const module = await this.ensurePrimaryModule(courseId);
+    const lessons = await this.prisma.lesson.findMany({
+      where: { module: { courseId, deletedAt: null }, deletedAt: null },
+    });
+    if (lessons.length === 0) {
+      throw new BadRequestException('No lessons exist in this course to reorder.');
+    }
+    if (!dto.items?.length || dto.items.length !== lessons.length) {
+      throw new BadRequestException('Reorder payload must include all course lessons');
+    }
+    const ids = new Set(lessons.map((l) => l.id));
+    if (dto.items.some((item) => !ids.has(item.id))) {
+      throw new BadRequestException('Reorder includes a lesson that is not in this course');
+    }
+
+    await this.prisma.$transaction(
+      dto.items.map((item, index) =>
+        this.prisma.lesson.update({
+          where: { id: item.id },
+          data: { sortOrder: index, moduleId: module.id },
+        }),
+      ),
+    );
+
+    await this.audit.write({
+      actorId: actor.userId,
+      action: AuditActions.LESSON_REORDER,
+      entityType: 'Course',
+      entityId: courseId,
+      ...meta,
+    });
+
+    return this.listCourseLessons(courseId);
+  }
+
   async createLesson(
     moduleId: string,
     dto: CreateLessonDto,
@@ -394,6 +502,7 @@ export class CoursesService {
         title: dto.title.trim(),
         description: dto.description?.trim() || null,
         type: dto.type,
+        status: dto.status ?? undefined,
         contentMediaId: dto.contentMediaId ?? null,
         durationSeconds: dto.durationSeconds ?? null,
         quizConfig: (dto.quizConfig ?? undefined) as
@@ -439,6 +548,7 @@ export class CoursesService {
             ? undefined
             : dto.description?.trim() || null,
         type: dto.type,
+        status: dto.status,
         contentMediaId: dto.contentMediaId,
         durationSeconds: dto.durationSeconds,
         quizConfig:
@@ -706,10 +816,12 @@ export class CoursesService {
       throw new BadRequestException('Publish requires at least one lesson');
     }
 
-    const pdfLessons = lessons.filter((l) => l.type === LessonType.PDF);
-    if (pdfLessons.length === 0) {
+    const mediaLessons = lessons.filter(
+      (l) => l.type === LessonType.PDF || l.type === LessonType.VIDEO,
+    );
+    if (mediaLessons.length === 0) {
       throw new BadRequestException(
-        'Publish requires at least one PDF lesson with an uploaded document',
+        'Publish requires at least one PDF or video lesson with uploaded content',
       );
     }
 
@@ -736,6 +848,20 @@ export class CoursesService {
         } catch {
           throw new BadRequestException(
             `Lesson "${lesson.title}" has a broken media reference — re-upload the ${lesson.type} content`,
+          );
+        }
+      }
+
+      const assessment = lesson.quiz;
+      if (assessment) {
+        if (assessment.status !== QuizStatus.PUBLISHED) {
+          throw new BadRequestException(
+            `Publish assessment for "${lesson.title}" before publishing the course`,
+          );
+        }
+        if ((assessment._count?.questions ?? 0) < 1) {
+          throw new BadRequestException(
+            `Assessment for "${lesson.title}" needs at least one question`,
           );
         }
       }
@@ -794,6 +920,22 @@ export class CoursesService {
     if (existing) {
       throw new ConflictException('Course code is already in use');
     }
+  }
+
+  private async ensurePrimaryModule(courseId: string) {
+    await this.requireCourse(courseId);
+    const existing = await this.prisma.courseModule.findFirst({
+      where: { courseId, deletedAt: null },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (existing) return existing;
+    return this.prisma.courseModule.create({
+      data: {
+        courseId,
+        title: 'Course Content',
+        sortOrder: 0,
+      },
+    });
   }
 
   private async requireCourse(id: string) {

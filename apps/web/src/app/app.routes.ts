@@ -60,6 +60,50 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'learning/programs/:programId/levels/:levelId',
+        loadComponent: () =>
+          import('./features/learning/program-level-page.component').then(
+            (m) => m.ProgramLevelPageComponent,
+          ),
+      },
+      {
+        path: 'learning/programs/:programId',
+        loadComponent: () =>
+          import('./features/learning/program-overview-page.component').then(
+            (m) => m.ProgramOverviewPageComponent,
+          ),
+      },
+      {
+        path: 'programs',
+        canActivate: [roleGuard(['SUPER_ADMIN', 'ADMIN'])],
+        loadComponent: () =>
+          import('./features/programs/programs-list-page.component').then(
+            (m) => m.ProgramsListPageComponent,
+          ),
+      },
+      {
+        path: 'programs/:id',
+        canActivate: [roleGuard(['SUPER_ADMIN', 'ADMIN'])],
+        loadComponent: () =>
+          import('./features/programs/program-editor-page.component').then(
+            (m) => m.ProgramEditorPageComponent,
+          ),
+      },
+      {
+        path: 'programs/:programId/final-assessment',
+        loadComponent: () =>
+          import('./features/learning/final-assessment-page.component').then(
+            (m) => m.FinalAssessmentPageComponent,
+          ),
+      },
+      {
+        path: 'programs/:programId/certificate',
+        loadComponent: () =>
+          import('./features/learning/certificate-page.component').then(
+            (m) => m.CertificatePageComponent,
+          ),
+      },
+      {
         path: 'courses',
         canActivate: [roleGuard(['SUPER_ADMIN', 'ADMIN'])],
         loadComponent: () =>

@@ -96,6 +96,32 @@ export class CoursesApiService {
       .pipe(map((r) => r.data));
   }
 
+  listLessons(courseId: string): Observable<LessonDto[]> {
+    return this.http
+      .get<ApiSuccessResponse<LessonDto[]>>(`${this.baseUrl}/${courseId}/lessons`)
+      .pipe(map((r) => r.data));
+  }
+
+  createCourseLesson(courseId: string, body: Record<string, unknown>): Observable<LessonDto> {
+    return this.http
+      .post<ApiSuccessResponse<LessonDto>>(`${this.baseUrl}/${courseId}/lessons`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  reorderCourseLessons(courseId: string, items: { id: string }[]): Observable<LessonDto[]> {
+    return this.http
+      .post<ApiSuccessResponse<LessonDto[]>>(`${this.baseUrl}/${courseId}/lessons/reorder`, {
+        items,
+      })
+      .pipe(map((r) => r.data));
+  }
+
+  getLesson(lessonId: string): Observable<LessonDto> {
+    return this.http
+      .get<ApiSuccessResponse<LessonDto>>(`${this.baseUrl}/lessons/${lessonId}`)
+      .pipe(map((r) => r.data));
+  }
+
   createLesson(moduleId: string, body: Record<string, unknown>): Observable<LessonDto> {
     const mediaId = body['contentMediaId'];
     if (mediaId !== undefined && mediaId !== null) {

@@ -6,128 +6,121 @@ import { InputText } from 'primeng/inputtext';
 import { Password } from 'primeng/password';
 import { Message } from 'primeng/message';
 import { AuthService } from '../../core/auth/auth.service';
+import { AuthLayoutComponent } from './auth-layout.component';
 
 @Component({
   selector: 'app-login-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, Button, InputText, Password, Message],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    Button,
+    InputText,
+    Password,
+    Message,
+    AuthLayoutComponent,
+  ],
   template: `
-    <div class="auth-shell">
-      <section class="auth-card">
-        <div class="brand-block">
-          <img src="brand/logo.png" alt="Zebl" class="auth-logo" />
-          <p class="eyebrow">Zebl</p>
-          <h1>Zebl Training Portal</h1>
-          <p class="lede">Sign in to manage mandatory learning and people operations.</p>
+    <app-auth-layout>
+      <h1>Sign in</h1>
+      <p class="lede">Use your work email to continue to Zebl India LMS.</p>
+
+      @if (error()) {
+        <p-message severity="error" [text]="error()!" styleClass="w-full mb-4" />
+      }
+
+      <form class="form-stack" [formGroup]="form" (ngSubmit)="submit()">
+        <label class="field">
+          <span>Email</span>
+          <input pInputText type="email" formControlName="email" autocomplete="username" />
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <p-password
+            formControlName="password"
+            [feedback]="false"
+            [toggleMask]="true"
+            styleClass="w-full"
+            inputStyleClass="w-full"
+            autocomplete="current-password"
+          />
+        </label>
+
+        <div class="row-between">
+          <a routerLink="/forgot-password" class="link">Forgot password?</a>
         </div>
 
-        @if (error()) {
-          <p-message severity="error" [text]="error()!" styleClass="w-full mb-4" />
-        }
-
-        <form class="form-stack" [formGroup]="form" (ngSubmit)="submit()">
-          <label class="field">
-            <span>Email</span>
-            <input pInputText type="email" formControlName="email" autocomplete="username" />
-          </label>
-
-          <label class="field">
-            <span>Password</span>
-            <p-password
-              formControlName="password"
-              [feedback]="false"
-              [toggleMask]="true"
-              styleClass="w-full"
-              inputStyleClass="w-full"
-              autocomplete="current-password"
-            />
-          </label>
-
-          <div class="row-between">
-            <a routerLink="/forgot-password" class="link">Forgot password?</a>
-          </div>
-
-          <p-button
-            type="submit"
-            label="Sign in"
-            styleClass="w-full"
-            [loading]="loading()"
-            [disabled]="form.invalid || loading()"
-          />
-        </form>
-      </section>
-    </div>
+        <p-button
+          type="submit"
+          label="Sign in"
+          styleClass="w-full auth-submit"
+          [loading]="loading()"
+          [disabled]="form.invalid || loading()"
+        />
+      </form>
+    </app-auth-layout>
   `,
   styles: [
     `
-      .auth-shell {
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: var(--ctp-page-pad);
-        background: var(--ctp-bg);
-      }
-      .auth-card {
-        width: min(400px, 100%);
-        background: var(--ctp-surface);
-        border: 1px solid var(--ctp-border);
-        border-radius: var(--ctp-radius);
-        padding: var(--s5);
-        box-shadow: var(--ctp-shadow);
-      }
-      .brand-block h1 {
-        margin: 4px 0 6px;
-        font-size: var(--ctp-fs-title);
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
         font-weight: 600;
-        color: var(--ctp-ink);
+        color: #111827;
         line-height: 1.25;
       }
-      .auth-logo {
-        display: block;
-        height: 40px;
-        width: auto;
-        max-width: 160px;
-        object-fit: contain;
-        object-position: left center;
-        margin-bottom: 10px;
-        border-radius: 6px;
-        background: #000;
-      }
-      .eyebrow {
-        margin: 0;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--ctp-primary);
-      }
       .lede {
-        margin: 0 0 var(--s4);
-        color: var(--ctp-muted);
-        font-size: var(--ctp-fs-body);
+        margin: 0 0 20px;
+        color: #6b7280;
+        font-size: 13px;
       }
       .form-stack {
         display: grid;
-        gap: var(--s3);
+        gap: 14px;
       }
       .field {
         display: grid;
-        gap: 4px;
-        font-size: var(--ctp-fs-label);
+        gap: 6px;
+        font-size: 12px;
         font-weight: 500;
+        color: #374151;
+      }
+      .field input {
+        width: 100%;
+        min-height: 44px;
       }
       .row-between {
         display: flex;
         justify-content: flex-end;
       }
       .link {
-        font-size: var(--ctp-fs-body);
-        color: var(--ctp-primary);
+        font-size: 13px;
+        color: #139f8a;
         text-decoration: none;
-        font-weight: 500;
+        font-weight: 600;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
       }
       .link:hover {
         text-decoration: underline;
+      }
+      :host ::ng-deep .p-password,
+      :host ::ng-deep .p-password-input {
+        width: 100%;
+      }
+      :host ::ng-deep .p-password-input {
+        min-height: 44px;
+      }
+      :host ::ng-deep .auth-submit.p-button {
+        min-height: 44px;
+        background: #51459e;
+        border-color: #51459e;
+      }
+      :host ::ng-deep .auth-submit.p-button:not(:disabled):hover {
+        background: #433884;
+        border-color: #433884;
       }
     `,
   ],

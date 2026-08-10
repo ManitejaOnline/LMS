@@ -18,7 +18,6 @@ import { Tooltip } from 'primeng/tooltip';
 import * as pdfjsLib from 'pdfjs-dist';
 import { configurePdfJsWorker } from '../../utils/pdfjs-setup';
 import { FullscreenLearningToolbarComponent } from '../fullscreen-learning-toolbar/fullscreen-learning-toolbar.component';
-import { ContentWatermarkComponent } from '../content-watermark/content-watermark.component';
 
 type FitMode = 'width' | 'page' | 'custom';
 
@@ -31,7 +30,6 @@ type FitMode = 'width' | 'page' | 'custom';
     FormsModule,
     Tooltip,
     FullscreenLearningToolbarComponent,
-    ContentWatermarkComponent,
   ],
   template: `
     <div class="pdf-shell" #shell [class.is-fullscreen]="isFullscreen()">
@@ -50,7 +48,6 @@ type FitMode = 'width' | 'page' | 'custom';
         (zoomOut)="zoomOut()"
         (search)="runSearch($event)"
       />
-      <app-content-watermark />
 
       <div class="toolbar" [class.is-hidden-fs]="isFullscreen()">
         <div class="toolbar-group">
@@ -151,7 +148,10 @@ type FitMode = 'width' | 'page' | 'custom';
         (scroll)="onScroll($event)"
         (wheel)="onWheel($event)"
       >
-        <canvas #canvas></canvas>
+        <div class="pdf-page">
+          <canvas #canvas></canvas>
+          <div class="pdf-watermark" aria-hidden="true">Zebl India LMS</div>
+        </div>
       </div>
 
       @if (error()) {
@@ -230,11 +230,33 @@ type FitMode = 'width' | 'page' | 'custom';
         align-items: flex-start;
         padding: 8px;
       }
+      /* Positioning wrapper only — must not size-contain or clip the canvas.
+         container-type:inline-size + overflow:hidden collapsed this box to 0×? and hid the PDF. */
+      .pdf-page {
+        position: relative;
+      }
       canvas {
         display: block;
         box-shadow: var(--ctp-shadow);
         background: #fff;
         max-width: none;
+      }
+      .pdf-watermark {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-20deg);
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        z-index: 1;
+        color: #64748b;
+        opacity: 0.12;
+        font-size: 16px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        line-height: 1.2;
       }
       .error,
       .search-status {

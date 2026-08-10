@@ -4,6 +4,7 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -13,6 +14,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Button } from 'primeng/button';
 import { ProgressBar } from 'primeng/progressbar';
 import { Message } from 'primeng/message';
+import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
 import { LearningApiService } from '../../core/http/learning-api.service';
 import { LearningTrackerService } from '../../core/learning/learning-tracker.service';
@@ -21,7 +23,7 @@ import { ContentProtectionService } from '../../core/content-protection/content-
 import { ProtectedMediaService } from '../../core/content-protection/protected-media.service';
 import { PdfViewerComponent } from '../../shared/components/pdf-viewer/pdf-viewer.component';
 import { VideoPlayerComponent } from '../../shared/components/video-player/video-player.component';
-import { QuizRunnerComponent } from '../../shared/components/quiz-runner/quiz-runner.component';
+import { AssessmentRunnerComponent } from '../../shared/components/assessment-runner/assessment-runner.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state/loading-state.component';
 import { ContentProtectionLayerComponent } from '../../shared/components/content-protection-layer/content-protection-layer.component';
 import type {
@@ -30,6 +32,8 @@ import type {
   PlayerLessonDto,
   PlayerPayload,
 } from '../../core/models/domain.models';
+import { isLessonSequentiallyLocked } from '../../shared/utils/sequential-lessons.util';
+import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
 
 @Component({
   selector: 'app-course-player-page',
@@ -40,10 +44,11 @@ import type {
     Button,
     ProgressBar,
     Message,
+    Dialog,
     InputText,
     PdfViewerComponent,
     VideoPlayerComponent,
-    QuizRunnerComponent,
+    AssessmentRunnerComponent,
     LoadingStateComponent,
     ContentProtectionLayerComponent,
   ],
@@ -61,7 +66,7 @@ import type {
       >
         <header class="player-top">
           <div class="top-left">
-            <a routerLink="/app/my-learning" class="back" aria-label="Back to My Learning">
+            <a [routerLink]="backLink()" class="back" [attr.aria-label]="backLabel()">
               <i class="pi pi-arrow-left"></i>
             </a>
             <h1>{{ payload()!.course.title }}</h1>
@@ -115,9 +120,17 @@ import type {
               <div class="viewer-body">
                 <app-content-protection-layer
                   class="cp-host"
-                  [lessonId]="lesson.type === 'QUIZ' ? null : lesson.id"
+                  [lessonId]="viewMode() === 'assessment' ? null : lesson.id"
                 >
-                  @if (lesson.type === 'PDF' && mediaUrl(lesson)) {
+                  @if (viewMode() === 'assessment' && lesson.assessment) {
+                    <app-assessment-runner
+                      [assignmentId]="payload()!.assignment.id"
+                      [lessonId]="lesson.id"
+                      [assessment]="lesson.assessment"
+                      (completed)="onAssessmentCompleted($event)"
+                      (continueNext)="goNextAfterAssessment()"
+                    />
+                  } @else if (lesson.type === 'PDF' && mediaUrl(lesson)) {
                     <app-pdf-viewer
                       #pdfViewer
                       chrome="minimal"
@@ -144,19 +157,13 @@ import type {
                       [learningPageLabel]="displayLessonTitle(lesson)"
                       [learningTimerLabel]="videoWatchLabel()"
                       [learningPaused]="tabHidden() || protection.forcePaused()"
-                      [learningComplete]="(currentProgress()?.watchPercentage ?? 0) >= 90"
+                      [learningComplete]="(currentProgress()?.watchPercentage ?? 0) >= (payload()?.videoCompletionPercent ?? 90)"
                       (play)="onVideoPlay($event)"
                       (pause)="onVideoPause($event)"
                       (seek)="onVideoSeek($event)"
                       (speed)="onVideoSpeed($event)"
                       (progress)="onVideoProgress($event)"
                       (fullscreenChange)="onViewerFullscreen($event)"
-                    />
-                  } @else if (lesson.type === 'QUIZ') {
-                    <app-quiz-runner
-                      [assignmentId]="payload()!.assignment.id"
-                      [lessonId]="lesson.id"
-                      (completed)="onQuizCompleted($event)"
                     />
                   } @else {
                     <div class="placeholder">
@@ -221,48 +228,59 @@ import type {
 
               <div class="outline-list">
                 @for (lesson of flatLessons(); track lesson.id) {
-                  <button
-                    type="button"
-                    class="outline-card"
-                    [class.active]="lesson.id === activeLessonId()"
-                    [class.done]="lessonStatus(lesson.id) === 'COMPLETED'"
-                    [class.locked]="isLessonLocked(lesson)"
-                    [disabled]="isLessonLocked(lesson)"
-                    (click)="selectLesson(lesson.id)"
-                  >
-                    <span class="card-icon" aria-hidden="true">
-                      @if (lessonStatus(lesson.id) === 'COMPLETED') {
-                        <i class="pi pi-check-circle"></i>
-                      } @else if (isLessonLocked(lesson)) {
-                        <i class="pi pi-lock"></i>
-                      } @else if (lesson.type === 'QUIZ') {
-                        <i class="pi pi-pencil"></i>
-                      } @else if (lesson.type === 'VIDEO') {
-                        <i class="pi pi-video"></i>
-                      } @else {
-                        <i class="pi pi-file"></i>
-                      }
-                    </span>
-
-                    <span class="card-body">
-                      <span class="card-title">{{ outlineItemTitle(lesson) }}</span>
-                      <span class="card-meta">{{ outlineItemMeta(lesson) }}</span>
-
-                      @if (lesson.id === activeLessonId() && lessonStatus(lesson.id) !== 'COMPLETED') {
-                        <span class="card-badge current">Current Lesson</span>
-                      }
-                      @if (isLessonLocked(lesson)) {
-                        <span class="card-badge locked">Locked until reading complete</span>
-                      }
-                      @if (
-                        lesson.type === 'QUIZ' &&
-                        !isLessonLocked(lesson) &&
-                        lessonStatus(lesson.id) !== 'COMPLETED'
-                      ) {
-                        <span class="card-badge action">▶ Start Quiz</span>
-                      }
-                    </span>
-                  </button>
+                  <div class="outline-group">
+                    <button
+                      type="button"
+                      class="outline-card"
+                      [class.active]="lesson.id === activeLessonId() && viewMode() === 'lesson'"
+                      [class.done]="lessonStatus(lesson.id) === 'COMPLETED'"
+                      [class.locked]="isLessonLocked(lesson)"
+                      [disabled]="isLessonLocked(lesson)"
+                      (click)="selectLesson(lesson.id)"
+                    >
+                      <span class="card-icon" aria-hidden="true">
+                        @if (lessonStatus(lesson.id) === 'COMPLETED') {
+                          <i class="pi pi-check-circle"></i>
+                        } @else if (isLessonLocked(lesson)) {
+                          <i class="pi pi-lock"></i>
+                        } @else if (lesson.type === 'VIDEO') {
+                          <i class="pi pi-video"></i>
+                        } @else {
+                          <i class="pi pi-file"></i>
+                        }
+                      </span>
+                      <span class="card-body">
+                        <span class="card-title">{{ outlineItemTitle(lesson) }}</span>
+                        <span class="card-meta">{{ outlineItemMeta(lesson) }}</span>
+                        @if (lesson.id === activeLessonId() && viewMode() === 'lesson' && lessonStatus(lesson.id) !== 'COMPLETED') {
+                          <span class="card-badge current">Current Lesson</span>
+                        }
+                        @if (isLessonLocked(lesson)) {
+                          <span class="card-badge locked">Locked</span>
+                        }
+                      </span>
+                    </button>
+                    @if (lesson.assessment; as assessment) {
+                      <button
+                        type="button"
+                        class="outline-card assessment-card"
+                        [class.active]="lesson.id === activeLessonId() && viewMode() === 'assessment'"
+                        [class.done]="assessment.state === 'passed'"
+                        [class.locked]="!canOpenAssessment(lesson)"
+                        [disabled]="!canOpenAssessment(lesson)"
+                        (click)="openAssessment(lesson.id)"
+                      >
+                        <span class="card-icon"><i class="pi pi-pencil"></i></span>
+                        <span class="card-body">
+                          <span class="card-title">{{ assessment.title || 'Assessment' }}</span>
+                          <span class="card-meta">{{ assessmentOutlineMeta(assessment) }}</span>
+                          <span class="card-badge" [class.locked]="assessment.state === 'locked' || assessment.state === 'exhausted'" [class.current]="assessment.state === 'ready'" [class.action]="assessment.state === 'failed'">
+                            {{ assessmentOutlineBadge(assessment) }}
+                          </span>
+                        </span>
+                      </button>
+                    }
+                  </div>
                 }
               </div>
             </div>
@@ -352,6 +370,15 @@ import type {
         </footer>
       </div>
     }
+
+    <p-dialog header="Level Complete" [(visible)]="levelCompleteVisible" [modal]="true" [style]="{ width: 'min(420px, 94vw)' }">
+      <p>{{ completedLevelTitle }} completed.</p>
+      <p>You've completed all required courses in this level.</p>
+      @if (nextLevelTitle) {
+        <p>Next: {{ nextLevelTitle }}</p>
+      }
+      <p-button label="Continue" (onClick)="levelCompleteVisible = false" />
+    </p-dialog>
   `,
   styles: [
     `
@@ -501,6 +528,7 @@ import type {
       .viewer-body > .cp-host,
       .viewer-body ::ng-deep .cp-content > app-pdf-viewer,
       .viewer-body ::ng-deep .cp-content > app-video-player,
+      .viewer-body ::ng-deep .cp-content > app-assessment-runner,
       .viewer-body ::ng-deep .cp-content > app-quiz-runner {
         flex: 1;
         min-height: 0;
@@ -656,6 +684,8 @@ import type {
         opacity: 0.72;
         color: var(--ctp-muted);
       }
+      .outline-group { display: grid; gap: 0.45rem; }
+      .assessment-card { margin-left: 1.1rem; }
       .card-icon {
         width: 28px;
         height: 28px;
@@ -885,6 +915,18 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   private idleStartedAt: number | null = null;
   private hidden = false;
   private blurred = false;
+  private completingLesson = false;
+  readonly viewMode = signal<'lesson' | 'assessment'>('lesson');
+  levelCompleteVisible = false;
+  completedLevelTitle = '';
+  nextLevelTitle = '';
+
+  constructor() {
+    effect(() => {
+      if (!this.canMarkComplete()) return;
+      queueMicrotask(() => this.completeLesson());
+    });
+  }
 
   readonly activeLesson = computed(() => {
     const id = this.activeLessonId();
@@ -902,6 +944,19 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     const id = this.activeLessonId();
     return id ? this.progressMap()[id] ?? null : null;
   });
+
+  backLink(): string[] {
+    const programId = this.route.snapshot.queryParamMap.get('programId');
+    const levelId = this.route.snapshot.queryParamMap.get('levelId');
+    if (programId && levelId) {
+      return ['/app/learning/programs', programId, 'levels', levelId];
+    }
+    return ['/app/my-learning'];
+  }
+
+  backLabel(): string {
+    return this.route.snapshot.queryParamMap.get('levelId') ? 'Back to Level' : 'Back to My Learning';
+  }
 
   ngOnInit(): void {
     this.syncOverlayMode();
@@ -1031,6 +1086,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
 
   selectLesson(lessonId: string): void {
     if (this.isLessonLockedById(lessonId)) return;
+    this.viewMode.set('lesson');
     this.activeLessonId.set(lessonId);
     this.tracker.track('LESSON_OPENED', lessonId);
     this.pdfCanPrev.set(false);
@@ -1045,37 +1101,51 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     return this.isLessonLockedById(lesson.id);
   }
 
+  canOpenAssessment(lesson: PlayerLessonDto): boolean {
+    return !this.isLessonLocked(lesson) && this.lessonStatus(lesson.id) === 'COMPLETED' && !!lesson.assessment;
+  }
+
+  openAssessment(lessonId: string): void {
+    const lesson = this.payload()?.lessons.find((item) => item.id === lessonId);
+    if (!lesson || !this.canOpenAssessment(lesson)) return;
+    this.activeLessonId.set(lessonId);
+    this.viewMode.set('assessment');
+  }
+
+  assessmentOutlineMeta(assessment: NonNullable<PlayerLessonDto['assessment']>): string {
+    if (assessment.state === 'passed') return 'Passed';
+    if (assessment.state === 'failed') return 'Not passed';
+    if (assessment.state === 'exhausted') return 'Attempts exhausted';
+    if (assessment.lockReason) return assessment.lockReason;
+    return `${assessment.questionCount} questions · Pass ${assessment.passingScore}%`;
+  }
+
+  assessmentOutlineBadge(assessment: NonNullable<PlayerLessonDto['assessment']>): string {
+    if (assessment.state === 'passed') return 'Passed';
+    if (assessment.state === 'failed') return 'Try again';
+    if (assessment.state === 'exhausted') return 'Attempts exhausted';
+    if (assessment.state === 'locked') return assessment.lockReason || 'Locked';
+    return 'Start';
+  }
+
   outlineItemTitle(lesson: PlayerLessonDto): string {
-    if (lesson.type === 'QUIZ') return 'Knowledge Check';
-    if (lesson.type === 'VIDEO') return 'Video';
-    return 'Reading';
+    return this.displayLessonTitle(lesson);
   }
 
   outlineItemMeta(lesson: PlayerLessonDto): string {
-    if (lesson.type === 'QUIZ') {
-      const count = lesson.quiz?._count?.questions;
-      return count ? `${count} Questions` : 'Assessment';
-    }
     if (lesson.type === 'PDF') {
       const total = this.lessonPageTotal(lesson);
-      const current =
-        lesson.id === this.activeLessonId()
-          ? this.pdfRelativePage()
-          : this.progressMap()[lesson.id]?.currentPage
-            ? Math.max(
-                1,
-                (this.progressMap()[lesson.id]!.currentPage || 1) -
-                  (this.chapterStart(lesson) || 1) +
-                  1,
-              )
-            : 1;
-      return total ? `${current} / ${total} Pages` : 'Reading';
+      return total ? `${total} pages` : 'PDF';
     }
     if (lesson.type === 'VIDEO') {
+      if (lesson.durationSeconds) {
+        const mins = Math.max(1, Math.round(lesson.durationSeconds / 60));
+        return `${mins} min`;
+      }
       const watched = Math.round(this.progressMap()[lesson.id]?.watchPercentage ?? 0);
-      return `${watched}% watched`;
+      return watched ? `${watched}% watched` : 'Video';
     }
-    return '';
+    return lesson.type;
   }
 
   lessonPageTotal(lesson: PlayerLessonDto): number | null {
@@ -1136,7 +1206,11 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     if (lesson.type === 'PDF') {
       return this.pageEngine.forwardUnlocked() && this.isLastPageInChapter();
     }
-    return true;
+    if (lesson.type === 'VIDEO') {
+      const threshold = this.payload()?.videoCompletionPercent ?? 90;
+      return (this.currentProgress()?.watchPercentage ?? 0) >= threshold;
+    }
+    return false;
   }
 
   pdfRelativePage(): number {
@@ -1203,9 +1277,12 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   completeLesson(): void {
     const assignmentId = this.payload()?.assignment.id;
     const lessonId = this.activeLessonId();
-    if (!assignmentId || !lessonId) return;
+    if (!assignmentId || !lessonId || this.completingLesson) return;
+    if (this.lessonStatus(lessonId) === 'COMPLETED') return;
+    this.completingLesson = true;
     this.api.completeLesson(assignmentId, lessonId).subscribe({
       next: (res) => {
+        this.completingLesson = false;
         this.payload.update((p) =>
           p ? { ...p, assignment: { ...p.assignment, ...res.assignment } } : p,
         );
@@ -1213,14 +1290,27 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
           ...map,
           [lessonId]: res.progress,
         }));
+        this.handleProgramEvent(res.assignment.programEvent);
+        const lesson = this.activeLesson();
+        if (lesson?.assessment) {
+          this.api.player(assignmentId).subscribe({
+            next: (payload) => {
+              this.payload.set(payload);
+              this.syncProgress(payload.progress);
+              this.viewMode.set('assessment');
+            },
+          });
+        }
       },
-      error: (err) =>
-        this.error.set(err?.error?.error?.message ?? 'Could not complete lesson'),
+      error: (err) => {
+        this.completingLesson = false;
+        this.error.set(err?.error?.error?.message ?? 'Could not complete lesson');
+      },
     });
   }
 
-  onQuizCompleted(result: { passed: boolean }): void {
-    if (!result.passed) return;
+  onAssessmentCompleted(_result: QuizSubmitResult): void {
+    this.handleProgramEvent(_result.programEvent);
     const assignmentId = this.payload()?.assignment.id;
     if (!assignmentId) return;
     this.api.player(assignmentId).subscribe({
@@ -1229,6 +1319,26 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
         this.syncProgress(payload.progress);
       },
     });
+  }
+
+  goNextAfterAssessment(): void {
+    this.viewMode.set('lesson');
+    this.goNext();
+  }
+
+  private handleProgramEvent(
+    event?: {
+      newlyCompletedLevelId: string | null;
+      newlyCompletedLevelTitle: string | null;
+      nextLevelTitle: string | null;
+      programJustCompleted: boolean;
+    } | null,
+  ): void {
+    if (!event?.newlyCompletedLevelTitle) return;
+    this.completedLevelTitle = event.newlyCompletedLevelTitle;
+    this.nextLevelTitle = event.nextLevelTitle ?? '';
+    this.levelCompleteVisible = true;
+    sessionStorage.setItem('zebl-level-complete', JSON.stringify(event));
   }
 
   onPdfPage(event: {
@@ -1247,6 +1357,9 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   onPdfPageLoaded(event: { currentPage: number; totalPages: number }): void {
     this.pageEngine.onPageLoaded(event.currentPage, event.totalPages);
     this.syncPdfNav();
+    if (this.canMarkComplete()) {
+      this.completeLesson();
+    }
   }
 
   onPdfScroll(pct: number): void {
@@ -1291,6 +1404,17 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     const lessonId = this.activeLessonId();
     if (!lessonId) return;
     this.tracker.track('VIDEO_PROGRESS', lessonId, event);
+    this.progressMap.update((map) => {
+      const current = map[lessonId];
+      if (!current) return map;
+      return {
+        ...map,
+        [lessonId]: { ...current, watchPercentage: event.watchPercentage, resumePositionSec: event.currentTime },
+      };
+    });
+    if (this.canMarkComplete()) {
+      this.completeLesson();
+    }
   }
 
   private syncOverlayMode(): void {
@@ -1300,19 +1424,20 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
 
   private isLessonLockedById(lessonId: string): boolean {
     const lessons = this.payload()?.lessons ?? [];
-    const index = lessons.findIndex((l) => l.id === lessonId);
-    if (index < 0) return true;
-    const lesson = lessons[index];
-    if (lesson.type !== 'QUIZ') return false;
-
-    // Lock quizzes until the nearest preceding reading/video is completed.
-    for (let i = index - 1; i >= 0; i -= 1) {
-      const prev = lessons[i];
-      if (prev.type === 'PDF' || prev.type === 'VIDEO') {
-        return this.lessonStatus(prev.id) !== 'COMPLETED';
-      }
-    }
-    return false;
+    const completed = new Set(
+      lessons
+        .filter((lesson) => this.lessonStatus(lesson.id) === 'COMPLETED')
+        .map((lesson) => lesson.id),
+    );
+    const passed = new Set(
+      lessons.filter((lesson) => lesson.assessment?.passed).map((lesson) => lesson.id),
+    );
+    return isLessonSequentiallyLocked(
+      lessons.map((lesson) => ({ id: lesson.id, hasAssessment: !!lesson.assessment })),
+      lessonId,
+      completed,
+      passed,
+    );
   }
 
   private sameAsFilename(title: string, originalName: string): boolean {

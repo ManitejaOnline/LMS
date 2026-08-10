@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
 import { Checkbox } from 'primeng/checkbox';
@@ -160,8 +160,10 @@ import { QuizApiService, type QuizQuestionAdmin } from '../../../core/http/quiz-
 })
 export class QuizBankEditorComponent {
   private readonly api = inject(QuizApiService);
+  readonly saved = output<void>();
 
   lessonId = '';
+  levelId = '';
   visible = false;
 
   title = 'Knowledge check';
@@ -177,12 +179,13 @@ export class QuizBankEditorComponent {
 
   open(lessonId: string): void {
     this.lessonId = lessonId;
+    this.levelId = '';
     this.visible = true;
     this.loadError.set(null);
     this.saveError.set(null);
     this.api.getAdminQuiz(lessonId).subscribe({
       next: (bank) => {
-        this.title = bank.title;
+        this.title = bank.title || 'Assessment';
         this.passingScore = bank.passingScore;
         this.questionCount = bank.questionCount;
         this.maxAttempts = bank.maxAttempts;
@@ -200,6 +203,38 @@ export class QuizBankEditorComponent {
       },
       error: () => {
         this.loadError.set('No bank yet — create questions below.');
+        this.questions = [this.emptyQuestion()];
+      },
+    });
+  }
+
+  openForLevel(levelId: string): void {
+    this.levelId = levelId;
+    this.lessonId = '';
+    this.visible = true;
+    this.loadError.set(null);
+    this.saveError.set(null);
+    this.title = 'Final assessment';
+    this.api.getAdminLevelQuiz(levelId).subscribe({
+      next: (bank) => {
+        this.title = bank.title || 'Final assessment';
+        this.passingScore = bank.passingScore;
+        this.questionCount = bank.questionCount;
+        this.maxAttempts = bank.maxAttempts;
+        this.shuffleQuestions = bank.shuffleQuestions;
+        this.questions = bank.questions.map((q) => ({
+          id: q.id,
+          prompt: q.prompt,
+          points: q.points,
+          options: q.options.map((o) => ({
+            id: o.id,
+            label: o.label,
+            isCorrect: o.isCorrect,
+          })),
+        }));
+      },
+      error: () => {
+        this.loadError.set('No final assessment yet — create questions below.');
         this.questions = [this.emptyQuestion()];
       },
     });
@@ -238,25 +273,28 @@ export class QuizBankEditorComponent {
       }
     }
     this.saving.set(true);
-    this.api
-      .upsertQuiz(this.lessonId, {
-        title: this.title,
-        passingScore: Number(this.passingScore),
-        questionCount: Number(this.questionCount),
-        maxAttempts: Number(this.maxAttempts),
-        shuffleQuestions: this.shuffleQuestions,
-        questions: this.questions.map((q) => ({
-          prompt: q.prompt.trim(),
-          points: q.points ?? 1,
-          options: q.options
-            .filter((o) => o.label.trim())
-            .map((o) => ({ label: o.label.trim(), isCorrect: o.isCorrect })),
-        })),
-      })
-      .subscribe({
+    const payload = {
+      title: this.title,
+      passingScore: Number(this.passingScore),
+      questionCount: Number(this.questionCount),
+      maxAttempts: Number(this.maxAttempts),
+      shuffleQuestions: this.shuffleQuestions,
+      questions: this.questions.map((q) => ({
+        prompt: q.prompt.trim(),
+        points: q.points ?? 1,
+        options: q.options
+          .filter((o) => o.label.trim())
+          .map((o) => ({ label: o.label.trim(), isCorrect: o.isCorrect })),
+      })),
+    };
+    const req = this.levelId
+      ? this.api.upsertLevelQuiz(this.levelId, { ...payload, status: 'PUBLISHED' })
+      : this.api.upsertQuiz(this.lessonId, payload);
+    req.subscribe({
         next: () => {
           this.saving.set(false);
           this.visible = false;
+          this.saved.emit();
         },
         error: (err) => {
           this.saving.set(false);

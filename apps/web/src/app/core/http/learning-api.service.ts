@@ -59,6 +59,56 @@ export class LearningApiService {
       .pipe(map((r) => r.data));
   }
 
+  learnerCourseLessons(courseId: string) {
+    return this.http
+      .get<
+        ApiSuccessResponse<{
+          assignmentId: string;
+          lessons: PlayerPayload['lessons'];
+          progress: LessonProgressDto[];
+          resumeLessonId: string | null;
+        }>
+      >(`${environment.apiBaseUrl}/learner/courses/${courseId}/lessons`)
+      .pipe(map((r) => r.data));
+  }
+
+  learnerLessonProgress(lessonId: string) {
+    return this.http
+      .get<
+        ApiSuccessResponse<{
+          assignmentId: string;
+          lessonId: string;
+          progress: LessonProgressDto | null;
+        }>
+      >(`${environment.apiBaseUrl}/learner/lessons/${lessonId}/progress`)
+      .pipe(map((r) => r.data));
+  }
+
+  saveLearnerLessonProgress(
+    lessonId: string,
+    body: { resumePositionSec?: number; watchPercentage?: number },
+  ) {
+    return this.http
+      .post<
+        ApiSuccessResponse<{
+          assignment: CourseAssignmentDto;
+          progress: LessonProgressDto[];
+        }>
+      >(`${environment.apiBaseUrl}/learner/lessons/${lessonId}/progress`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  completeLearnerLesson(lessonId: string) {
+    return this.http
+      .post<
+        ApiSuccessResponse<{
+          progress: LessonProgressDto;
+          assignment: CourseAssignmentDto;
+        }>
+      >(`${environment.apiBaseUrl}/learner/lessons/${lessonId}/complete`, {})
+      .pipe(map((r) => r.data));
+  }
+
   completeLesson(assignmentId: string, lessonId: string) {
     return this.http
       .post<

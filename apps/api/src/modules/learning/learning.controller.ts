@@ -16,6 +16,7 @@ import type { AuthenticatedUser } from '../../infrastructure/auth/types/authenti
 import { AssignCourseDto } from './dto/assign-course.dto';
 import { IngestLearningEventsDto } from './dto/ingest-learning-events.dto';
 import { CompletePageDto, SavePageProgressDto } from './dto/page-progress.dto';
+import { LearnerLessonProgressDto } from './dto/learner-lesson-progress.dto';
 import { LearningService } from './learning.service';
 import { PageProgressService } from './page-progress.service';
 
@@ -27,6 +28,43 @@ export class LearningController {
     private readonly learningService: LearningService,
     private readonly pageProgress: PageProgressService,
   ) {}
+
+  @Get('learner/courses/:courseId/lessons')
+  @ApiOperation({ summary: 'Enrolled learner: ordered course lessons + lock state' })
+  learnerCourseLessons(
+    @Param('courseId') courseId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.learningService.listLearnerCourseLessons(courseId, user);
+  }
+
+  @Get('learner/lessons/:lessonId/progress')
+  @ApiOperation({ summary: 'Enrolled learner: lesson progress' })
+  learnerLessonProgress(
+    @Param('lessonId') lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.learningService.getLearnerLessonProgress(lessonId, user);
+  }
+
+  @Post('learner/lessons/:lessonId/progress')
+  @ApiOperation({ summary: 'Enrolled learner: persist video/resume progress' })
+  saveLearnerLessonProgress(
+    @Param('lessonId') lessonId: string,
+    @Body() dto: LearnerLessonProgressDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.learningService.saveLearnerLessonProgress(lessonId, dto, user);
+  }
+
+  @Post('learner/lessons/:lessonId/complete')
+  @ApiOperation({ summary: 'Enrolled learner: complete current accessible lesson' })
+  completeLearnerLesson(
+    @Param('lessonId') lessonId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.learningService.completeLearnerLesson(lessonId, user);
+  }
 
   @Get('learning/dashboard')
   @ApiOperation({ summary: 'Employee learning dashboard counters' })

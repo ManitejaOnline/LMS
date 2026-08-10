@@ -53,6 +53,7 @@ export interface AuthTokensResponse {
 }
 
 export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type LessonStatus = 'DRAFT' | 'PUBLISHED';
 export type LessonType = 'PDF' | 'VIDEO' | 'QUIZ';
 export type MediaKind = 'THUMBNAIL' | 'DOCUMENT' | 'VIDEO';
 export type AssignmentRuleTargetType = 'ALL_EMPLOYEES' | 'DEPARTMENT' | 'EMPLOYEE';
@@ -73,12 +74,38 @@ export interface LessonDto {
   title: string;
   description: string | null;
   type: LessonType;
+  status?: LessonStatus;
   sortOrder: number;
   contentMediaId: string | null;
   durationSeconds: number | null;
   quizConfig: Record<string, unknown> | null;
   contentMedia?: MediaAssetDto | null;
-  quiz?: { id: string; _count?: { questions: number } } | null;
+  quiz?: {
+    id: string;
+    title?: string | null;
+    passingScore?: number;
+    maxAttempts?: number;
+    status?: 'DRAFT' | 'PUBLISHED';
+    showCorrectAnswers?: boolean;
+    _count?: { questions: number };
+  } | null;
+}
+
+export type AssessmentLearnerState = 'locked' | 'ready' | 'passed' | 'failed' | 'exhausted';
+
+export interface PlayerAssessmentDto {
+  id: string;
+  title: string | null;
+  passingScore: number;
+  maxAttempts: number;
+  questionCount: number;
+  state: AssessmentLearnerState;
+  lockReason: string | null;
+  passed: boolean;
+  lastScore: number | null;
+  attemptCount: number;
+  remainingAttempts: number;
+  lastAttemptId: string | null;
 }
 
 export interface CourseModuleDto {
@@ -145,9 +172,18 @@ export interface CourseAssignmentDto {
   completedAt: string | null;
   progressPercent: number;
   lastLessonId: string | null;
+  programEnrollmentId?: string | null;
   assignedAt: string;
   isOverdue?: boolean;
+  programEvent?: ProgramSyncEvent | null;
   course: CourseDto;
+}
+
+export interface ProgramSyncEvent {
+  newlyCompletedLevelId: string | null;
+  newlyCompletedLevelTitle: string | null;
+  nextLevelTitle: string | null;
+  programJustCompleted: boolean;
 }
 
 export interface LessonProgressDto {
@@ -189,6 +225,8 @@ export interface PageProgressDto {
 
 export interface PlayerLessonDto extends LessonDto {
   moduleTitle: string;
+  locked?: boolean;
+  assessment?: PlayerAssessmentDto | null;
 }
 
 export interface PlayerPayload {
@@ -198,6 +236,7 @@ export interface PlayerPayload {
   progress: LessonProgressDto[];
   pageProgress?: PageProgressDto[];
   requiredSecondsPerPage?: number;
+  videoCompletionPercent?: number;
   resumeLessonId: string | null;
 }
 

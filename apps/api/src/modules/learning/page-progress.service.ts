@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AssignmentStatus,
   LessonProgressStatus,
   LessonType,
   type PageProgress,
@@ -18,10 +19,14 @@ import {
   PDF_PAGE_REQUIRED_SECONDS,
 } from './learning.constants';
 import type { CompletePageDto, SavePageProgressDto } from './dto/page-progress.dto';
+import { SequentialAccessService } from './sequential-access.service';
 
 @Injectable()
 export class PageProgressService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sequentialAccess: SequentialAccessService,
+  ) {}
 
   async listPageProgress(
     assignmentId: string,
@@ -51,6 +56,11 @@ export class PageProgressService {
     const assignment = await this.requireOwnedAssignment(assignmentId, user);
     const lesson = await this.requirePdfLesson(lessonId);
     await this.ensureLessonInCourse(assignment.courseId, lessonId);
+    await this.sequentialAccess.assertAccessible(
+      assignmentId,
+      assignment.courseId,
+      lessonId,
+    );
 
     const pageNumber = dto.pageNumber;
     const now = new Date();
@@ -162,6 +172,11 @@ export class PageProgressService {
     const assignment = await this.requireOwnedAssignment(assignmentId, user);
     const lesson = await this.requirePdfLesson(lessonId);
     await this.ensureLessonInCourse(assignment.courseId, lessonId);
+    await this.sequentialAccess.assertAccessible(
+      assignmentId,
+      assignment.courseId,
+      lessonId,
+    );
 
     const pageNumber = dto.pageNumber;
     if (!pageNumber || pageNumber < 1) {
@@ -310,6 +325,61 @@ export class PageProgressService {
       source: 'page_progress_engine',
       pageStart,
       pageEnd,
+    });
+    await this.recalculateAssignmentProgress(assignmentId);
+  }
+
+  private async recalculateAssignmentProgress(assignmentId: string) {
+    const assignment = await this.prisma.courseAssignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        course: {
+          include: {
+            modules: {
+              where: { deletedAt: null },
+              include: { lessons: { where: { deletedAt: null } } },
+            },
+          },
+        },
+      },
+    });
+    if (!assignment) return;
+
+    const lessonIds = assignment.course.modules.flatMap((mod) =>
+      mod.lessons
+        .filter((lesson) => lesson.type !== LessonType.QUIZ)
+        .map((lesson) => lesson.id),
+    );
+    const total = lessonIds.length || 1;
+    const progressRows = await this.prisma.lessonProgress.findMany({
+      where: { assignmentId, lessonId: { in: lessonIds } },
+    });
+    const completed = progressRows.filter(
+      (row) => row.status === LessonProgressStatus.COMPLETED,
+    ).length;
+    const percent = Math.round((completed / total) * 100);
+    const status =
+      percent >= 100
+        ? AssignmentStatus.COMPLETED
+        : completed > 0 ||
+            progressRows.some((row) => row.status !== LessonProgressStatus.NOT_STARTED)
+          ? AssignmentStatus.IN_PROGRESS
+          : assignment.status;
+
+    await this.prisma.courseAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        progressPercent: Math.min(100, percent),
+        status,
+        completedAt:
+          status === AssignmentStatus.COMPLETED
+            ? assignment.completedAt ?? new Date()
+            : null,
+        startedAt:
+          status === AssignmentStatus.NOT_STARTED
+            ? assignment.startedAt
+            : assignment.startedAt ?? new Date(),
+      },
     });
   }
 

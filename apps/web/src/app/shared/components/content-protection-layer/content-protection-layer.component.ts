@@ -26,7 +26,7 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
       </div>
 
       @if (protection.active()) {
-        <!-- Watermark also rendered inside PDF/Video shells for Fullscreen API -->
+        <!-- PDF watermark is page-scoped inside the viewer; video keeps its overlay. -->
       }
 
       @if (protection.toastMessage(); as msg) {
@@ -97,9 +97,6 @@ export class ContentProtectionLayerComponent implements OnDestroy {
   private readonly host = inject(ElementRef<HTMLElement>);
 
   readonly lessonId = input<string | null>(null);
-
-  /** Enough tiles reserved for documentation; watermark lives in viewer shells. */
-  readonly tiles = Array.from({ length: 0 });
 
   constructor() {
     effect(() => {

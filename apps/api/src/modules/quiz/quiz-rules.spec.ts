@@ -1,9 +1,11 @@
 import { AppRole } from '@zebl/shared';
-
-/** Pure scoring helper extracted for unit tests (mirrors quiz pass rule). */
-export function isQuizPassing(score: number, passingScore: number): boolean {
-  return score >= passingScore;
-}
+import {
+  isAssessmentPassing,
+  remainingAttempts,
+  scorePercent,
+  validateAssessmentPublish,
+  validateMcqQuestion,
+} from './assessment-rules';
 
 export function canAccessReports(role: AppRole): boolean {
   return (
@@ -13,13 +15,74 @@ export function canAccessReports(role: AppRole): boolean {
   );
 }
 
-describe('quiz pass rule', () => {
+describe('assessment pass rule', () => {
   it('passes at exact threshold', () => {
-    expect(isQuizPassing(70, 70)).toBe(true);
+    expect(isAssessmentPassing(80, 80)).toBe(true);
   });
 
   it('fails below threshold', () => {
-    expect(isQuizPassing(69, 70)).toBe(false);
+    expect(isAssessmentPassing(79, 80)).toBe(false);
+  });
+
+  it('scores by percent rounded', () => {
+    expect(scorePercent(8, 10)).toBe(80);
+    expect(scorePercent(0, 0)).toBe(0);
+  });
+
+  it('tracks remaining attempts', () => {
+    expect(remainingAttempts(3, 3)).toBe(0);
+    expect(remainingAttempts(3, 1)).toBe(2);
+  });
+});
+
+describe('assessment question validation', () => {
+  it('requires exactly one correct option', () => {
+    expect(
+      validateMcqQuestion({
+        prompt: 'Why verify eligibility?',
+        options: [
+          { label: 'Submit claim', isCorrect: false },
+          { label: 'Verify coverage', isCorrect: true },
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      validateMcqQuestion({
+        prompt: 'Why verify eligibility?',
+        options: [
+          { label: 'A', isCorrect: true },
+          { label: 'B', isCorrect: true },
+        ],
+      }),
+    ).toMatch(/exactly one correct/i);
+  });
+
+  it('rejects fewer than two options', () => {
+    expect(
+      validateMcqQuestion({
+        prompt: 'Question',
+        options: [{ label: 'Only', isCorrect: true }],
+      }),
+    ).toMatch(/at least 2/i);
+  });
+
+  it('blocks publish without title or questions', () => {
+    expect(
+      validateAssessmentPublish({
+        title: '',
+        passingScore: 80,
+        maxAttempts: 3,
+        questions: [],
+      }),
+    ).toMatch(/title/i);
+    expect(
+      validateAssessmentPublish({
+        title: 'Eligibility',
+        passingScore: 80,
+        maxAttempts: 3,
+        questions: [],
+      }),
+    ).toMatch(/question/i);
   });
 });
 

@@ -9,9 +9,9 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
+import { IsEntityId } from '../../../common/decorators/is-entity-id.decorator';
 
 export class LearningEventDto {
   @ApiProperty({ enum: LearningEventType })
@@ -20,7 +20,7 @@ export class LearningEventDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   lessonId?: string;
 
   @ApiProperty()

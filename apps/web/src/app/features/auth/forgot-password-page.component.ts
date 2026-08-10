@@ -5,102 +5,88 @@ import { Button } from 'primeng/button';
 import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { AuthService } from '../../core/auth/auth.service';
+import { AuthLayoutComponent } from './auth-layout.component';
 
 @Component({
   selector: 'app-forgot-password-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, Button, InputText, Message],
+  imports: [ReactiveFormsModule, RouterLink, Button, InputText, Message, AuthLayoutComponent],
   template: `
-    <div class="auth-shell">
-      <section class="auth-card">
-        <p class="eyebrow">Account recovery</p>
-        <h1>Forgot password</h1>
-        <p class="lede">Enter your work email and we’ll send reset instructions.</p>
+    <app-auth-layout>
+      <h1>Forgot password</h1>
+      <p class="lede">Enter your work email and we’ll send reset instructions.</p>
 
-        @if (message()) {
-          <p-message severity="success" [text]="message()!" styleClass="w-full mb-4" />
-        }
-        @if (devToken()) {
-          <p-message
-            severity="info"
-            [text]="'Dev reset token: ' + devToken()"
-            styleClass="w-full mb-4"
-          />
-        }
-        @if (error()) {
-          <p-message severity="error" [text]="error()!" styleClass="w-full mb-4" />
-        }
+      @if (message()) {
+        <p-message severity="success" [text]="message()!" styleClass="w-full mb-4" />
+      }
+      @if (devToken()) {
+        <p-message
+          severity="info"
+          [text]="'Dev reset token: ' + devToken()"
+          styleClass="w-full mb-4"
+        />
+      }
+      @if (error()) {
+        <p-message severity="error" [text]="error()!" styleClass="w-full mb-4" />
+      }
 
-        <form class="form-stack" [formGroup]="form" (ngSubmit)="submit()">
-          <label class="field">
-            <span>Email</span>
-            <input pInputText type="email" formControlName="email" />
-          </label>
-          <p-button
-            type="submit"
-            label="Send reset link"
-            styleClass="w-full"
-            [loading]="loading()"
-            [disabled]="form.invalid || loading()"
-          />
-          <a routerLink="/login" class="link">Back to sign in</a>
-        </form>
-      </section>
-    </div>
+      <form class="form-stack" [formGroup]="form" (ngSubmit)="submit()">
+        <label class="field">
+          <span>Email</span>
+          <input pInputText type="email" formControlName="email" />
+        </label>
+        <p-button
+          type="submit"
+          label="Send reset link"
+          styleClass="w-full auth-submit"
+          [loading]="loading()"
+          [disabled]="form.invalid || loading()"
+        />
+        <a routerLink="/login" class="link">Back to sign in</a>
+      </form>
+    </app-auth-layout>
   `,
   styles: [
     `
-      .auth-shell {
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: var(--ctp-page-pad);
-        background: var(--ctp-bg);
-      }
-      .auth-card {
-        width: min(400px, 100%);
-        background: var(--ctp-surface);
-        border: 1px solid var(--ctp-border);
-        border-radius: var(--ctp-radius);
-        padding: var(--s5);
-        box-shadow: var(--ctp-shadow);
-      }
       h1 {
-        margin: 4px 0 6px;
-        color: var(--ctp-ink);
-        font-size: var(--ctp-fs-title);
+        margin: 0 0 6px;
+        color: #111827;
+        font-size: 22px;
         font-weight: 600;
         line-height: 1.25;
       }
-      .eyebrow {
-        margin: 0;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--ctp-primary);
-      }
       .lede {
-        color: var(--ctp-muted);
-        font-size: var(--ctp-fs-body);
-        margin: 0 0 var(--s4);
+        color: #6b7280;
+        font-size: 13px;
+        margin: 0 0 20px;
       }
       .form-stack {
         display: grid;
-        gap: var(--s3);
+        gap: 14px;
       }
       .field {
         display: grid;
-        gap: 4px;
-        font-size: var(--ctp-fs-label);
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
       }
       .field input {
         width: 100%;
+        min-height: 44px;
       }
       .link {
-        color: var(--ctp-primary);
+        color: #139f8a;
         text-decoration: none;
-        font-size: var(--ctp-fs-body);
+        font-size: 13px;
+        font-weight: 600;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+      :host ::ng-deep .auth-submit.p-button {
+        min-height: 44px;
+        background: #51459e;
+        border-color: #51459e;
       }
     `,
   ],

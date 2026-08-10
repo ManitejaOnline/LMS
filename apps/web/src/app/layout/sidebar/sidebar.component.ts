@@ -32,13 +32,12 @@ import { SidebarStateService } from './sidebar-state.service';
         >
           <i class="pi pi-bars" aria-hidden="true"></i>
         </button>
-        <div class="brand-mark" aria-hidden="true">
-          <img src="brand/logo.png" alt="" class="brand-logo" />
-        </div>
-        <div class="brand-text" [attr.aria-hidden]="collapsed() ? true : null">
-          <div class="brand-title">Zebl Training Portal</div>
-          <div class="brand-sub">Learning</div>
-        </div>
+        <img
+          src="brand/logo.png"
+          alt="Zebl India"
+          class="brand-logo"
+          [attr.aria-hidden]="collapsed() ? true : null"
+        />
       </div>
 
       <nav class="nav" aria-label="Main">
@@ -150,71 +149,21 @@ import { SidebarStateService } from './sidebar-state.service';
         outline: 2px solid var(--ctp-primary);
         outline-offset: 1px;
       }
-      .brand-mark {
-        width: 28px;
-        height: 28px;
-        border-radius: var(--ctp-radius);
-        background: #000;
-        color: var(--ctp-primary);
-        display: grid;
-        place-items: center;
-        font-size: 13px;
-        flex-shrink: 0;
-        opacity: 1;
-        transform: scale(1);
-        max-width: 28px;
-        overflow: hidden;
-        transition:
-          opacity 200ms ease-in-out,
-          transform 200ms ease-in-out,
-          max-width 200ms ease-in-out,
-          margin 200ms ease-in-out;
-      }
       .brand-logo {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: left center;
         display: block;
-      }
-      .brand-text {
-        min-width: 0;
-        flex: 1 1 auto;
-        opacity: 1;
-        transform: translateX(0);
+        width: auto;
+        height: auto;
         max-width: 160px;
-        overflow: hidden;
-        transition:
-          opacity 200ms ease-in-out,
-          transform 200ms ease-in-out,
-          max-width 200ms ease-in-out;
+        max-height: 42px;
+        object-fit: contain;
+        object-position: left center;
+        flex: 0 0 auto;
+        background: none;
+        border: 0;
+        box-shadow: none;
       }
-      .collapsed .brand-mark,
-      .collapsed .brand-text {
-        opacity: 0;
-        transform: scale(0.85);
-        max-width: 0;
-        width: 0;
-        margin: 0;
-        padding: 0;
-        flex: 0 0 0;
-        overflow: hidden;
-        pointer-events: none;
-      }
-      .collapsed .brand-text {
-        transform: translateX(-6px);
-      }
-      .brand-title {
-        font-weight: 600;
-        font-size: 13px;
-        line-height: 1.2;
-        white-space: nowrap;
-      }
-      .brand-sub {
-        font-size: 11px;
-        color: var(--ctp-muted);
-        line-height: 1.2;
-        white-space: nowrap;
+      .collapsed .brand-logo {
+        display: none;
       }
       .nav {
         display: grid;
@@ -379,8 +328,6 @@ import { SidebarStateService } from './sidebar-state.service';
         transform: translateX(0);
         box-shadow: 8px 0 24px rgba(17, 24, 39, 0.12);
       }
-      .sidebar.overlay .brand-mark,
-      .sidebar.overlay .brand-text,
       .sidebar.overlay .nav-label {
         opacity: 1;
         transform: none;
@@ -390,13 +337,10 @@ import { SidebarStateService } from './sidebar-state.service';
         overflow: visible;
         pointer-events: auto;
       }
-      .sidebar.overlay .brand-mark {
-        max-width: 28px;
-        flex: 0 0 auto;
-      }
-      .sidebar.overlay .brand-text {
+      .sidebar.overlay .brand-logo {
+        display: block;
         max-width: 160px;
-        flex: 1 1 auto;
+        max-height: 42px;
       }
       .sidebar.overlay .nav a,
       .sidebar.overlay .sidebar-footer a,

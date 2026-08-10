@@ -12,6 +12,7 @@ import {
   LessonProgressStatus,
   LessonType,
   Prisma,
+  QuizStatus,
   UserStatus,
 } from '@prisma/client';
 import { AuditActions } from '../../infrastructure/audit/audit.constants';
@@ -24,8 +25,18 @@ import {
   IngestLearningEventsDto,
   LearningEventDto,
 } from './dto/ingest-learning-events.dto';
-import { PDF_PAGE_REQUIRED_SECONDS } from './learning.constants';
+import {
+  PDF_PAGE_REQUIRED_SECONDS,
+  VIDEO_COMPLETION_PERCENT,
+} from './learning.constants';
 import { PageProgressService } from './page-progress.service';
+import type { LearnerLessonProgressDto } from './dto/learner-lesson-progress.dto';
+import { SequentialAccessService } from './sequential-access.service';
+import { ProgramProgressService } from '../programs/program-progress.service';
+import {
+  firstUnlockedIncompleteLessonId,
+  isLessonSequentiallyLocked,
+} from './sequential-lessons.util';
 
 const coursePlayerInclude = {
   thumbnailMedia: true,
@@ -39,9 +50,15 @@ const coursePlayerInclude = {
         include: {
           contentMedia: true,
           quiz: {
+            where: { deletedAt: null },
             select: {
               id: true,
-              _count: { select: { questions: true } },
+              title: true,
+              passingScore: true,
+              maxAttempts: true,
+              status: true,
+              questionCount: true,
+              _count: { select: { questions: { where: { deletedAt: null } } } },
             },
           },
         },
@@ -59,6 +76,8 @@ export class LearningService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationService,
     private readonly pageProgress: PageProgressService,
+    private readonly sequentialAccess: SequentialAccessService,
+    private readonly programProgress: ProgramProgressService,
   ) {}
 
   async applyRules(
@@ -340,18 +359,73 @@ export class LearningService {
       orderBy: [{ lessonId: 'asc' }, { pageNumber: 'asc' }],
     });
 
-    const flatLessons = course.modules.flatMap((m) =>
-      m.lessons.map((lesson) => ({
-        ...lesson,
-        moduleId: m.id,
-        moduleTitle: m.title,
-      })),
+    const gate = await this.sequentialAccess.loadSequenceState(
+      assignment.id,
+      assignment.courseId,
     );
+
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { assignmentId: assignment.id },
+      orderBy: { attemptNumber: 'desc' },
+      select: {
+        id: true,
+        quizId: true,
+        attemptNumber: true,
+        score: true,
+        passed: true,
+        submittedAt: true,
+      },
+    });
+
+    const flatLessons = course.modules.flatMap((m) =>
+      m.lessons
+        .filter((lesson) => lesson.type !== LessonType.QUIZ)
+        .map((lesson) => ({
+          ...lesson,
+          moduleId: m.id,
+          moduleTitle: m.title,
+        })),
+    );
+
+    const lessons = flatLessons.map((lesson) => {
+      const { quiz, ...rest } = lesson;
+      const locked = isLessonSequentiallyLocked(
+        gate.lessons,
+        lesson.id,
+        gate.completedIds,
+        gate.passedAssessmentIds,
+      );
+      return {
+        ...rest,
+        locked,
+        assessment: this.toPlayerAssessment(
+          quiz,
+          attempts,
+          gate.completedIds.has(lesson.id),
+          locked,
+        ),
+      };
+    });
+
+    const preferredResume =
+      assignment.lastLessonId &&
+      !isLessonSequentiallyLocked(
+        gate.lessons,
+        assignment.lastLessonId,
+        gate.completedIds,
+        gate.passedAssessmentIds,
+      )
+        ? assignment.lastLessonId
+        : firstUnlockedIncompleteLessonId(
+            gate.lessons,
+            gate.completedIds,
+            gate.passedAssessmentIds,
+          );
 
     return {
       assignment,
       course,
-      lessons: flatLessons,
+      lessons,
       progress,
       pageProgress: pageProgress.map((p) => ({
         id: p.id,
@@ -372,13 +446,60 @@ export class LearningService {
         idleCount: p.idleCount,
       })),
       requiredSecondsPerPage: PDF_PAGE_REQUIRED_SECONDS,
-      resumeLessonId:
-        assignment.lastLessonId ||
-        progress.find((p) => p.status === LessonProgressStatus.IN_PROGRESS)
-          ?.lessonId ||
-        flatLessons[0]?.id ||
-        null,
+      videoCompletionPercent: VIDEO_COMPLETION_PERCENT,
+      resumeLessonId: preferredResume,
     };
+  }
+
+  async listLearnerCourseLessons(courseId: string, user: AuthenticatedUser) {
+    const assignment = await this.requireEnrollment(courseId, user);
+    const player = await this.getPlayer(assignment.id, user);
+    return {
+      assignmentId: assignment.id,
+      lessons: player.lessons,
+      progress: player.progress,
+      resumeLessonId: player.resumeLessonId,
+    };
+  }
+
+  async getLearnerLessonProgress(lessonId: string, user: AuthenticatedUser) {
+    const assignment = await this.requireEnrollmentForLesson(lessonId, user);
+    await this.assertLessonAccessible(assignment.id, assignment.courseId, lessonId);
+    const progress = await this.prisma.lessonProgress.findUnique({
+      where: { assignmentId_lessonId: { assignmentId: assignment.id, lessonId } },
+    });
+    return { assignmentId: assignment.id, lessonId, progress };
+  }
+
+  async saveLearnerLessonProgress(
+    lessonId: string,
+    dto: LearnerLessonProgressDto,
+    user: AuthenticatedUser,
+  ) {
+    const assignment = await this.requireEnrollmentForLesson(lessonId, user);
+    await this.assertLessonAccessible(assignment.id, assignment.courseId, lessonId);
+    return this.ingestEvents(
+      assignment.id,
+      {
+        events: [
+          {
+            eventType: 'VIDEO_PROGRESS',
+            lessonId,
+            occurredAt: new Date().toISOString(),
+            payload: {
+              currentTime: dto.resumePositionSec,
+              watchPercentage: dto.watchPercentage,
+            },
+          },
+        ],
+      },
+      user,
+    );
+  }
+
+  async completeLearnerLesson(lessonId: string, user: AuthenticatedUser) {
+    const assignment = await this.requireEnrollmentForLesson(lessonId, user);
+    return this.markLessonComplete(assignment.id, lessonId, user);
   }
 
   async resumePdfLesson(
@@ -388,6 +509,7 @@ export class LearningService {
   ) {
     const assignment = await this.requireOwnedAssignment(assignmentId, user);
     await this.ensureLessonBelongsToCourse(assignment.courseId, lessonId);
+    await this.assertLessonAccessible(assignment.id, assignment.courseId, lessonId);
 
     const lesson = await this.prisma.lesson.findFirst({
       where: { id: lessonId, deletedAt: null },
@@ -466,12 +588,21 @@ export class LearningService {
       assignment.courseId,
       lessonId,
     );
+    await this.assertLessonAccessible(assignment.id, assignment.courseId, lessonId);
 
     const progress = await this.upsertLessonProgress(
       assignment.id,
       lessonId,
       user.userId,
     );
+
+    if (lesson.type === LessonType.VIDEO) {
+      if ((progress.watchPercentage ?? 0) < VIDEO_COMPLETION_PERCENT) {
+        throw new ForbiddenException(
+          `Watch at least ${VIDEO_COMPLETION_PERCENT}% of the video before completing this lesson.`,
+        );
+      }
+    }
 
     if (lesson.type === LessonType.PDF) {
       const bounds = this.readPdfChapterBounds(lesson.quizConfig);
@@ -550,6 +681,11 @@ export class LearningService {
         where: { id: assignmentId },
       });
       await this.ensureLessonBelongsToCourse(assignment.courseId, event.lessonId);
+      await this.assertLessonAccessible(
+        assignment.id,
+        assignment.courseId,
+        event.lessonId,
+      );
     }
 
     try {
@@ -678,7 +814,7 @@ export class LearningService {
     if (
       progress.status !== LessonProgressStatus.COMPLETED &&
       lesson?.type === LessonType.VIDEO &&
-      (nextWatch ?? 0) >= 90
+      (nextWatch ?? 0) >= VIDEO_COMPLETION_PERCENT
     ) {
       data.status = LessonProgressStatus.COMPLETED;
       data.completedAt = new Date(event.occurredAt);
@@ -703,6 +839,72 @@ export class LearningService {
     });
   }
 
+  private toPlayerAssessment(
+    quiz:
+      | {
+          id: string;
+          title: string | null;
+          passingScore: number;
+          maxAttempts: number;
+          status: QuizStatus;
+          questionCount: number;
+          _count?: { questions: number };
+        }
+      | null
+      | undefined,
+    attempts: Array<{
+      id: string;
+      quizId: string;
+      attemptNumber: number;
+      score: number | null;
+      passed: boolean | null;
+      submittedAt: Date | null;
+    }>,
+    lessonCompleted: boolean,
+    lessonLocked: boolean,
+  ) {
+    if (!quiz || quiz.status !== QuizStatus.PUBLISHED) return null;
+    const mine = attempts.filter((row) => row.quizId === quiz.id);
+    const submitted = mine.filter((row) => row.submittedAt);
+    const passed = submitted.some((row) => row.passed);
+    const last = submitted[0] ?? null;
+    const remainingAttempts = Math.max(0, quiz.maxAttempts - mine.length);
+    let state: 'locked' | 'ready' | 'passed' | 'failed' | 'exhausted' = 'ready';
+    let lockReason: string | null = null;
+    if (lessonLocked) {
+      state = 'locked';
+      lockReason = 'Complete the previous lesson first';
+    } else if (!lessonCompleted) {
+      state = 'locked';
+      lockReason = 'Complete lesson first';
+    } else if (passed) {
+      state = 'passed';
+    } else if (remainingAttempts <= 0) {
+      state = 'exhausted';
+      lockReason = 'Attempts exhausted';
+    } else if (last && !last.passed) {
+      state = 'failed';
+    }
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      passingScore: quiz.passingScore,
+      maxAttempts: quiz.maxAttempts,
+      questionCount: quiz._count?.questions ?? quiz.questionCount,
+      state,
+      lockReason,
+      passed,
+      lastScore: last?.score ?? null,
+      attemptCount: mine.length,
+      remainingAttempts,
+      lastAttemptId: last?.id ?? null,
+    };
+  }
+
+  async refreshAssignmentProgress(assignmentId: string) {
+    return this.recalculateAssignmentProgress(assignmentId);
+  }
+
   private async recalculateAssignmentProgress(assignmentId: string) {
     const assignment = await this.prisma.courseAssignment.findUniqueOrThrow({
       where: { id: assignmentId },
@@ -721,7 +923,9 @@ export class LearningService {
     });
 
     const lessonIds = assignment.course.modules.flatMap((m) =>
-      m.lessons.map((l) => l.id),
+      m.lessons
+        .filter((l) => l.type !== LessonType.QUIZ)
+        .map((l) => l.id),
     );
     const total = lessonIds.length || 1;
     const progressRows = await this.prisma.lessonProgress.findMany({
@@ -732,14 +936,35 @@ export class LearningService {
     ).length;
     const percent = Math.round((completed / total) * 100);
 
+    const quizzes = await this.prisma.quiz.findMany({
+      where: {
+        lessonId: { in: lessonIds },
+        deletedAt: null,
+        status: QuizStatus.PUBLISHED,
+      },
+      select: { id: true },
+    });
+    const passedAttempts = quizzes.length
+      ? await this.prisma.quizAttempt.findMany({
+          where: {
+            assignmentId,
+            passed: true,
+            quizId: { in: quizzes.map((quiz) => quiz.id) },
+          },
+          select: { quizId: true },
+        })
+      : [];
+    const passedQuizIds = new Set(passedAttempts.map((row) => row.quizId));
+    const assessmentsComplete = quizzes.every((quiz) => passedQuizIds.has(quiz.id));
+
     let status = assignment.status;
-    if (percent >= 100) {
+    if (percent >= 100 && assessmentsComplete) {
       status = AssignmentStatus.COMPLETED;
     } else if (completed > 0 || progressRows.some((p) => p.status !== LessonProgressStatus.NOT_STARTED)) {
       status = AssignmentStatus.IN_PROGRESS;
     }
 
-    return this.prisma.courseAssignment.update({
+    const updated = await this.prisma.courseAssignment.update({
       where: { id: assignmentId },
       data: {
         progressPercent: Math.min(100, percent),
@@ -754,6 +979,11 @@ export class LearningService {
             : assignment.startedAt ?? new Date(),
       },
     });
+    const programEvent = await this.programProgress.syncForUserCourse(
+      assignment.userId,
+      assignment.courseId,
+    );
+    return { ...updated, programEvent };
   }
 
   private async upsertLessonProgress(
@@ -1048,7 +1278,43 @@ export class LearningService {
     if (!isOwner && !(options?.allowAdminRead && isAdmin)) {
       throw new ForbiddenException('You do not own this assignment');
     }
+    if (isOwner) {
+      await this.programProgress.assertCourseAccessible(assignment);
+    }
     return assignment;
+  }
+
+  private async requireEnrollment(courseId: string, user: AuthenticatedUser) {
+    const assignment = await this.prisma.courseAssignment.findFirst({
+      where: { courseId, userId: user.userId, deletedAt: null },
+    });
+    if (!assignment) {
+      throw new ForbiddenException('You are not enrolled in this course');
+    }
+    await this.programProgress.assertCourseAccessible(assignment);
+    return assignment;
+  }
+
+  private async requireEnrollmentForLesson(
+    lessonId: string,
+    user: AuthenticatedUser,
+  ) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, deletedAt: null },
+      include: { module: { select: { courseId: true } } },
+    });
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found');
+    }
+    return this.requireEnrollment(lesson.module.courseId, user);
+  }
+
+  async assertLessonAccessible(
+    assignmentId: string,
+    courseId: string,
+    lessonId: string,
+  ) {
+    await this.sequentialAccess.assertAccessible(assignmentId, courseId, lessonId);
   }
 
   private async ensureLessonBelongsToCourse(courseId: string, lessonId: string) {

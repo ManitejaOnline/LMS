@@ -252,6 +252,7 @@ export class ReportsService {
         quiz: {
           include: {
             lesson: { select: { id: true, title: true } },
+            level: { select: { id: true, title: true } },
           },
         },
       },
@@ -270,7 +271,8 @@ export class ReportsService {
     for (const attempt of attempts) {
       const key = attempt.quizId;
       const entry = byQuiz.get(key) ?? {
-        lessonTitle: attempt.quiz.lesson.title,
+        lessonTitle:
+          attempt.quiz.lesson?.title ?? attempt.quiz.level?.title ?? 'Assessment',
         attempts: 0,
         passed: 0,
         scoreSum: 0,

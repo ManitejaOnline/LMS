@@ -16,17 +16,17 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 const ZeblPreset = definePreset(Aura, {
   semantic: {
     primary: {
-      50: '#eff6ff',
-      100: '#dbeafe',
-      200: '#bfdbfe',
-      300: '#93c5fd',
-      400: '#60a5fa',
-      500: '#3b82f6',
-      600: '#2563eb',
-      700: '#1d4ed8',
-      800: '#1e40af',
-      900: '#1e3a8a',
-      950: '#172554',
+      50: '#f4f2fb',
+      100: '#e8e4f6',
+      200: '#d1c9ed',
+      300: '#b3a6e0',
+      400: '#8b7ac9',
+      500: '#6b5bb3',
+      600: '#51459e',
+      700: '#433884',
+      800: '#362d6b',
+      900: '#2c2656',
+      950: '#1a1733',
     },
   },
 });

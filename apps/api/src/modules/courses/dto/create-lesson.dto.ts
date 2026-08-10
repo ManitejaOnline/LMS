@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LessonType } from '@prisma/client';
+import { LessonStatus, LessonType } from '@prisma/client';
 import {
   IsEnum,
   IsInt,
@@ -28,6 +28,11 @@ export class CreateLessonDto {
   @ApiProperty({ enum: LessonType })
   @IsEnum(LessonType)
   type!: LessonType;
+
+  @ApiPropertyOptional({ enum: LessonStatus, default: LessonStatus.PUBLISHED })
+  @IsOptional()
+  @IsEnum(LessonStatus)
+  status?: LessonStatus;
 
   @ApiPropertyOptional({
     description: 'MediaAsset id (Prisma cuid) for PDF/VIDEO lessons',

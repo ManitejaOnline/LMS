@@ -228,11 +228,19 @@ export class QuizRunnerComponent implements OnChanges {
         if (passed) {
           this.result.set({
             id: passed.id,
+            attemptId: passed.id,
             score: passed.score ?? 0,
             passed: true,
             attemptNumber: passed.attemptNumber,
             submittedAt: passed.submittedAt ?? '',
             passingScore: 0,
+            correctCount: 0,
+            incorrectCount: 0,
+            totalQuestions: 0,
+            remainingAttempts: 0,
+            showCorrectAnswers: false,
+            lessonId: this.lessonId(),
+            title: null,
           });
           this.loading.set(false);
           return;

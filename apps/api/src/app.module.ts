@@ -20,6 +20,7 @@ import { MediaModule } from './modules/media/media.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { LearningModule } from './modules/learning/learning.module';
 import { QuizModule } from './modules/quiz/quiz.module';
+import { ProgramsModule } from './modules/programs/programs.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
@@ -80,6 +81,7 @@ import { REQUEST_ID_HEADER } from './common/constants/metadata.keys';
     DepartmentsModule,
     MediaModule,
     CoursesModule,
+    ProgramsModule,
     LearningModule,
     QuizModule,
     ReportsModule,

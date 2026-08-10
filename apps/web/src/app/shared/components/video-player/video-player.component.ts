@@ -119,6 +119,16 @@ export class VideoPlayerComponent implements OnChanges, OnDestroy {
         queueMicrotask(() => this.fsToolbar()?.onFullscreenEntered());
       }
     });
+    effect(() => {
+      if (!this.learningPaused()) return;
+      queueMicrotask(() => {
+        try {
+          this.videoRef().nativeElement.pause();
+        } catch {
+          /* view not ready */
+        }
+      });
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
