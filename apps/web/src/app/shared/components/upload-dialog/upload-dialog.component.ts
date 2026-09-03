@@ -6,6 +6,7 @@ import { Select } from 'primeng/select';
 import { Message } from 'primeng/message';
 import type { MediaAssetDto, MediaKind } from '../../../core/models/domain.models';
 import { CoursesApiService } from '../../../core/http/courses-api.service';
+import { mediaUploadErrorMessage } from '../../utils/media-upload-error.util';
 import { inject } from '@angular/core';
 
 @Component({
@@ -55,7 +56,7 @@ import { inject } from '@angular/core';
             (onClick)="visibleChange.emit(false)"
           />
           <p-button
-            label="Upload"
+            [label]="progressLabel()"
             [loading]="uploading()"
             [disabled]="!selectedFile || uploading()"
             (onClick)="upload()"
@@ -116,6 +117,7 @@ export class UploadDialogComponent {
   readonly uploaded = output<MediaAssetDto>();
 
   readonly uploading = signal(false);
+  readonly uploadPercent = signal<number | null>(null);
   readonly error = signal<string | null>(null);
   readonly fileName = signal<string | null>(null);
   readonly dragging = signal(false);
@@ -138,9 +140,9 @@ export class UploadDialogComponent {
 
   hint(): string {
     const kind = this.fixedKind() ?? this.kind;
-    if (kind === 'THUMBNAIL') return 'JPG, PNG, or WebP';
-    if (kind === 'DOCUMENT') return 'PDF only';
-    return 'MP4, WebM, or MOV';
+    if (kind === 'THUMBNAIL') return 'JPG, PNG, or WebP (max 5 MB)';
+    if (kind === 'DOCUMENT') return 'PDF only (max 50 MB)';
+    return 'MP4, WebM, or MOV (max 500 MB)';
   }
 
   onFile(event: Event): void {
@@ -149,16 +151,24 @@ export class UploadDialogComponent {
     this.fileName.set(this.selectedFile?.name ?? null);
   }
 
+  progressLabel(): string {
+    const pct = this.uploadPercent();
+    if (this.uploading() && pct != null) return `Uploading ${pct}%`;
+    return 'Upload';
+  }
+
   upload(): void {
     if (!this.selectedFile) {
       return;
     }
     const kind = this.fixedKind() ?? this.kind;
     this.uploading.set(true);
+    this.uploadPercent.set(0);
     this.error.set(null);
-    this.api.uploadMedia(kind, this.selectedFile).subscribe({
+    this.api.uploadMedia(kind, this.selectedFile, (pct) => this.uploadPercent.set(pct)).subscribe({
       next: (media) => {
         this.uploading.set(false);
+        this.uploadPercent.set(null);
         this.uploaded.emit(media);
         this.visibleChange.emit(false);
         this.selectedFile = null;
@@ -166,7 +176,8 @@ export class UploadDialogComponent {
       },
       error: (err) => {
         this.uploading.set(false);
-        this.error.set(err?.error?.error?.message ?? 'Upload failed');
+        this.uploadPercent.set(null);
+        this.error.set(mediaUploadErrorMessage(kind, err));
       },
     });
   }

@@ -1,13 +1,18 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join, extname, isAbsolute } from 'path';
 import {
+  BadRequestException,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MediaKind } from '@prisma/client';
-import { put } from '@vercel/blob';
+import { head, put } from '@vercel/blob';
 import { randomUUID } from 'crypto';
+import {
+  folderForKind,
+  isVercelBlobUrl,
+} from './media-upload.rules';
 
 @Injectable()
 export class StorageService {
@@ -26,6 +31,10 @@ export class StorageService {
     return Boolean(
       process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
     );
+  }
+
+  canIssueClientToken(): boolean {
+    return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
   }
 
   resolveRoot(): string {
@@ -54,20 +63,22 @@ export class StorageService {
     return ['video/mp4', 'video/webm', 'video/quicktime'];
   }
 
+  buildRelativePath(kind: MediaKind, originalName: string): string {
+    const extension = extname(originalName) || this.fallbackExt(kind);
+    return `${folderForKind(kind)}/${randomUUID()}${extension.toLowerCase()}`;
+  }
+
   async saveFile(params: {
     kind: MediaKind;
     originalName: string;
     buffer: Buffer;
     mimeType?: string;
   }): Promise<{ storagePath: string; publicUrl: string; absolutePath: string }> {
-    const extension = extname(params.originalName) || this.fallbackExt(params.kind);
-    const folder = params.kind.toLowerCase();
-    const fileName = `${randomUUID()}${extension}`;
-    const relativePath = `${folder}/${fileName}`;
+    const relativePath = this.buildRelativePath(params.kind, params.originalName);
+    const folder = folderForKind(params.kind);
+    const fileName = relativePath.split('/')[1]!;
 
     if (this.usesBlob()) {
-      // Prefer explicit RW token when set; otherwise SDK uses OIDC
-      // (BLOB_STORE_ID + VERCEL_OIDC_TOKEN) on Vercel automatically.
       const token = process.env.BLOB_READ_WRITE_TOKEN;
       const blob = await put(relativePath, params.buffer, {
         access: 'public',
@@ -106,6 +117,30 @@ export class StorageService {
       publicUrl,
       absolutePath,
     };
+  }
+
+  async requireOwnedBlob(params: {
+    url: string;
+    pathname: string;
+    expectedMime: string;
+    expectedSize: number;
+  }) {
+    if (!isVercelBlobUrl(params.url)) {
+      throw new BadRequestException('Upload URL is not a Vercel Blob object.');
+    }
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    const meta = await head(params.url, token ? { token } : {});
+    if (meta.pathname !== params.pathname && !meta.pathname.endsWith(params.pathname)) {
+      throw new BadRequestException('Uploaded object path does not match this session.');
+    }
+    if (meta.size !== params.expectedSize) {
+      throw new BadRequestException('Uploaded object size does not match the declared file size.');
+    }
+    const blobMime = (meta.contentType || '').split(';')[0]!.trim().toLowerCase();
+    if (blobMime && blobMime !== params.expectedMime) {
+      throw new BadRequestException('Uploaded object type does not match the declared MIME type.');
+    }
+    return meta;
   }
 
   isRemoteUrl(url: string | null | undefined): boolean {

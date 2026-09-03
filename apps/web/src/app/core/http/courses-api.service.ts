@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map, of } from 'rxjs';
+import { Observable, firstValueFrom, from, map, of } from 'rxjs';
+import { put } from '@vercel/blob/client';
 import { environment } from '../../../environments/environment';
 import type { ApiSuccessResponse } from '../models/api-response.model';
 import type {
@@ -191,15 +192,80 @@ export class CoursesApiService {
       .pipe(map((r) => r.data));
   }
 
-  uploadMedia(kind: string, file: File): Observable<MediaAssetDto> {
-    const form = new FormData();
-    // Fastify multipart only exposes fields that appear *before* the file
-    // when using request.file(); put kind first so auth'd uploads parse kind.
-    form.append('kind', kind);
-    form.append('file', file);
-    return this.http
-      .post<ApiSuccessResponse<MediaAssetDto>>(`${environment.apiBaseUrl}/media/upload`, form)
-      .pipe(map((r) => r.data));
+  uploadMedia(
+    kind: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Observable<MediaAssetDto> {
+    return from(this.uploadMediaAsync(kind, file, onProgress));
+  }
+
+  private async uploadMediaAsync(
+    kind: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Promise<MediaAssetDto> {
+    const plan = await firstValueFrom(
+      this.http
+        .post<
+          ApiSuccessResponse<{
+            strategy: 'proxy' | 'direct';
+            mimeType: string;
+            pathname?: string;
+            clientToken?: string;
+          }>
+        >(`${environment.apiBaseUrl}/media/upload-plan`, {
+          kind,
+          originalName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size,
+        })
+        .pipe(map((r) => r.data)),
+    );
+
+    if (plan.strategy !== 'direct') {
+      const form = new FormData();
+      form.append('kind', kind);
+      form.append('file', file);
+      return firstValueFrom(
+        this.http
+          .post<ApiSuccessResponse<MediaAssetDto>>(
+            `${environment.apiBaseUrl}/media/upload`,
+            form,
+          )
+          .pipe(map((r) => r.data)),
+      );
+    }
+
+    if (!plan.pathname || !plan.clientToken) {
+      throw new Error('Direct upload session is incomplete');
+    }
+
+    const blob = await put(plan.pathname, file, {
+      access: 'public',
+      token: plan.clientToken,
+      contentType: plan.mimeType,
+      multipart: true,
+      onUploadProgress: (event) => {
+        onProgress?.(Math.round(event.percentage));
+      },
+    });
+
+    return firstValueFrom(
+      this.http
+        .post<ApiSuccessResponse<MediaAssetDto>>(
+          `${environment.apiBaseUrl}/media/upload-complete`,
+          {
+            kind,
+            originalName: file.name,
+            mimeType: plan.mimeType,
+            sizeBytes: file.size,
+            pathname: plan.pathname,
+            url: blob.url,
+          },
+        )
+        .pipe(map((r) => r.data)),
+    );
   }
 
   private clean(params: Record<string, unknown>): Record<string, string | number> {

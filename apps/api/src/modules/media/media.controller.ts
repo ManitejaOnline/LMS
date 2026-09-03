@@ -35,6 +35,7 @@ import { extractClientMeta } from '../../common/utils/request-meta.util';
 import type { AuthenticatedUser } from '../../infrastructure/auth/types/authenticated-user';
 import { TokenService } from '../../infrastructure/auth/token.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
+import { CompleteMediaUploadDto, PlanMediaUploadDto } from './dto/media-upload.dto';
 import { MediaService } from './media.service';
 
 @ApiTags('Media')
@@ -46,6 +47,30 @@ export class MediaController {
     private readonly storage: StorageService,
     private readonly tokens: TokenService,
   ) {}
+
+  @Post('upload-plan')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @ApiOperation({
+    summary: 'Plan a media upload (proxy through API or direct to Vercel Blob)',
+  })
+  plan(@Body() dto: PlanMediaUploadDto) {
+    return this.mediaService.plan(dto);
+  }
+
+  @Post('upload-complete')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @ApiOperation({ summary: 'Register a file uploaded directly to Vercel Blob' })
+  complete(
+    @Body() dto: CompleteMediaUploadDto,
+    @Req() request: Request,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.mediaService.completeDirect({
+      ...dto,
+      actor,
+      meta: extractClientMeta(request),
+    });
+  }
 
   @Post('upload')
   @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)

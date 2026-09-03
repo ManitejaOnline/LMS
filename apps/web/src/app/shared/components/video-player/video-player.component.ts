@@ -12,12 +12,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { FullscreenLearningToolbarComponent } from '../fullscreen-learning-toolbar/fullscreen-learning-toolbar.component';
-import { ContentWatermarkComponent } from '../content-watermark/content-watermark.component';
 
 @Component({
   selector: 'app-video-player',
   standalone: true,
-  imports: [FullscreenLearningToolbarComponent, ContentWatermarkComponent],
+  imports: [FullscreenLearningToolbarComponent],
   template: `
     <div class="video-shell" #shell [class.is-fullscreen]="isFullscreen()">
       <app-fullscreen-learning-toolbar
@@ -31,23 +30,25 @@ import { ContentWatermarkComponent } from '../content-watermark/content-watermar
         (exitFullscreen)="exitFullscreen()"
         (toggleFullscreen)="toggleFullscreen()"
       />
-      <app-content-watermark tone="light" />
 
-      <video
-        #video
-        controls
-        playsinline
-        controlslist="nodownload noremoteplayback"
-        disablepictureinpicture
-        [attr.controlsList]="'nodownload noremoteplayback'"
-        [src]="src()"
-        (play)="onPlay()"
-        (pause)="onPause()"
-        (seeking)="onSeek()"
-        (ratechange)="onRate()"
-        (timeupdate)="onTime()"
-        (contextmenu)="$event.preventDefault()"
-      ></video>
+      <div class="video-stage">
+        <video
+          #video
+          controls
+          playsinline
+          controlslist="nodownload noremoteplayback"
+          disablepictureinpicture
+          [attr.controlsList]="'nodownload noremoteplayback'"
+          [src]="src()"
+          (play)="onPlay()"
+          (pause)="onPause()"
+          (seeking)="onSeek()"
+          (ratechange)="onRate()"
+          (timeupdate)="onTime()"
+          (contextmenu)="$event.preventDefault()"
+        ></video>
+        <div class="video-watermark" aria-hidden="true">Zebl India</div>
+      </div>
     </div>
   `,
   styles: [
@@ -68,16 +69,44 @@ import { ContentWatermarkComponent } from '../content-watermark/content-watermar
       .video-shell.is-fullscreen {
         background: #000;
       }
-      video {
+      .video-stage {
+        position: relative;
         width: min(100%, 1100px);
         max-height: 100%;
+        display: flex;
+      }
+      .video-shell.is-fullscreen .video-stage {
+        width: 100%;
+        height: 100%;
+      }
+      video {
+        width: 100%;
+        max-height: 100%;
         background: #000;
+        display: block;
       }
       .video-shell.is-fullscreen video {
         width: 100%;
         max-height: 100%;
         height: 100%;
         object-fit: contain;
+      }
+      .video-watermark {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-20deg);
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        z-index: 2;
+        color: #ffffff;
+        opacity: 0.22;
+        font-size: clamp(16px, 2.6vw, 22px);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        line-height: 1.2;
       }
     `,
   ],

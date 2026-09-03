@@ -36,6 +36,7 @@
     "@angular/router": "^20.3.0",
     "@primeuix/themes": "^1.2.5",
     "@tailwindcss/postcss": "^4.1.11",
+    "@vercel/blob": "^2.8.0",
     "@zebl/shared": "*",
     "pdfjs-dist": "^4.10.38",
     "postcss": "^8.5.6",
