@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MediaKind } from '@prisma/client';
-import { head, put } from '@vercel/blob';
+import { head, issueSignedToken, presignUrl, put } from '@vercel/blob';
 import { randomUUID } from 'crypto';
 import {
   folderForKind,
@@ -33,8 +33,28 @@ export class StorageService {
     );
   }
 
-  canIssueClientToken(): boolean {
-    return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  async createDirectPutUrl(params: {
+    pathname: string;
+    mimeType: string;
+    sizeBytes: number;
+  }): Promise<{ uploadUrl: string }> {
+    const signed = await issueSignedToken({
+      pathname: params.pathname,
+      operations: ['put'],
+      allowedContentTypes: [params.mimeType],
+      maximumSizeInBytes: params.sizeBytes,
+      validUntil: Date.now() + 60 * 60 * 1000,
+    });
+    const { presignedUrl } = await presignUrl(signed, {
+      operation: 'put',
+      pathname: params.pathname,
+      access: 'public',
+      allowedContentTypes: [params.mimeType],
+      maximumSizeInBytes: params.sizeBytes,
+      addRandomSuffix: false,
+      allowOverwrite: false,
+    });
+    return { uploadUrl: presignedUrl };
   }
 
   resolveRoot(): string {

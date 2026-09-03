@@ -5,7 +5,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { MediaKind } from '@prisma/client';
-import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import { AuditActions } from '../../infrastructure/audit/audit.constants';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
@@ -61,26 +60,30 @@ export class MediaService {
     if (!direct) {
       return { strategy: 'proxy' as const, mimeType: mime };
     }
-    if (!this.storage.canIssueClientToken()) {
+    if (!this.storage.usesBlob()) {
       throw new ServiceUnavailableException(
-        'Direct video upload requires BLOB_READ_WRITE_TOKEN on the API project.',
+        'File storage is not configured. Connect a Vercel Blob store to this project (Storage → Blob → Connect Project).',
       );
     }
     const pathname = this.storage.buildRelativePath(params.kind, params.originalName);
-    const clientToken = await generateClientTokenFromReadWriteToken({
-      pathname,
-      maximumSizeInBytes: params.sizeBytes,
-      allowedContentTypes: [mime],
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-    return {
-      strategy: 'direct' as const,
-      mimeType: mime,
-      pathname,
-      clientToken,
-    };
+    try {
+      const { uploadUrl } = await this.storage.createDirectPutUrl({
+        pathname,
+        mimeType: mime,
+        sizeBytes: params.sizeBytes,
+      });
+      return {
+        strategy: 'direct' as const,
+        mimeType: mime,
+        pathname,
+        uploadUrl,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Blob upload session failed';
+      throw new ServiceUnavailableException(
+        `Direct upload could not be prepared: ${message}`,
+      );
+    }
   }
 
   async completeDirect(params: {

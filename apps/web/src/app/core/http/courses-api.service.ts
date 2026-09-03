@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, firstValueFrom, from, map, of } from 'rxjs';
-import { put } from '@vercel/blob/client';
 import { environment } from '../../../environments/environment';
 import type { ApiSuccessResponse } from '../models/api-response.model';
 import type {
@@ -212,7 +211,7 @@ export class CoursesApiService {
             strategy: 'proxy' | 'direct';
             mimeType: string;
             pathname?: string;
-            clientToken?: string;
+            uploadUrl?: string;
           }>
         >(`${environment.apiBaseUrl}/media/upload-plan`, {
           kind,
@@ -237,19 +236,11 @@ export class CoursesApiService {
       );
     }
 
-    if (!plan.pathname || !plan.clientToken) {
+    if (!plan.pathname || !plan.uploadUrl) {
       throw new Error('Direct upload session is incomplete');
     }
 
-    const blob = await put(plan.pathname, file, {
-      access: 'public',
-      token: plan.clientToken,
-      contentType: plan.mimeType,
-      multipart: true,
-      onUploadProgress: (event) => {
-        onProgress?.(Math.round(event.percentage));
-      },
-    });
+    const blob = await putBlobWithProgress(plan.uploadUrl, file, plan.mimeType, onProgress);
 
     return firstValueFrom(
       this.http
@@ -277,4 +268,42 @@ export class CoursesApiService {
     });
     return result;
   }
+}
+
+function putBlobWithProgress(
+  uploadUrl: string,
+  file: File,
+  contentType: string,
+  onProgress?: (percent: number) => void,
+): Promise<{ url: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(`Storage rejected the upload (${xhr.status}).`));
+        return;
+      }
+      try {
+        const body = xhr.responseText ? (JSON.parse(xhr.responseText) as { url?: string }) : {};
+        if (!body.url || !/^https:\/\//i.test(body.url)) {
+          reject(new Error('Storage did not return a public file URL.'));
+          return;
+        }
+        onProgress?.(100);
+        resolve({ url: body.url });
+      } catch {
+        reject(new Error('Storage returned an unexpected response.'));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Direct upload to storage failed.'));
+    xhr.onabort = () => reject(new Error('Upload was cancelled.'));
+    xhr.send(file);
+  });
 }
