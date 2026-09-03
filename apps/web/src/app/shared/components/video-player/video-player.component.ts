@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FullscreenLearningToolbarComponent } from '../fullscreen-learning-toolbar/fullscreen-learning-toolbar.component';
+import { clampVideoStartAt, videoWatchPercentage } from '../../utils/video-resume.util';
 
 @Component({
   selector: 'app-video-player',
@@ -36,17 +37,24 @@ import { FullscreenLearningToolbarComponent } from '../fullscreen-learning-toolb
           #video
           controls
           playsinline
+          preload="metadata"
           controlslist="nodownload noremoteplayback"
           disablepictureinpicture
           [attr.controlsList]="'nodownload noremoteplayback'"
           [src]="src()"
+          (loadedmetadata)="onLoadedMetadata()"
+          (error)="onError()"
           (play)="onPlay()"
           (pause)="onPause()"
+          (ended)="onEnded()"
           (seeking)="onSeek()"
           (ratechange)="onRate()"
           (timeupdate)="onTime()"
           (contextmenu)="$event.preventDefault()"
         ></video>
+        @if (loadError()) {
+          <p class="video-error">This video could not be loaded. Refresh the page and try again.</p>
+        }
         <div class="video-watermark" aria-hidden="true">Zebl India</div>
       </div>
     </div>
@@ -54,42 +62,59 @@ import { FullscreenLearningToolbarComponent } from '../fullscreen-learning-toolb
   styles: [
     `
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
         height: 100%;
         min-height: 0;
       }
       .video-shell {
+        flex: 1;
+        width: 100%;
         height: 100%;
-        display: grid;
-        place-items: center;
-        background: #0b181d;
         min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0b181d;
         position: relative;
+        overflow: hidden;
       }
       .video-shell.is-fullscreen {
         background: #000;
       }
       .video-stage {
         position: relative;
-        width: min(100%, 1100px);
-        max-height: 100%;
-        display: flex;
-      }
-      .video-shell.is-fullscreen .video-stage {
         width: 100%;
         height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       video {
-        width: 100%;
-        max-height: 100%;
-        background: #000;
         display: block;
-      }
-      .video-shell.is-fullscreen video {
         width: 100%;
-        max-height: 100%;
         height: 100%;
+        max-width: 100%;
+        max-height: 100%;
         object-fit: contain;
+        object-position: center center;
+        background: #000;
+      }
+      .video-error {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 56px;
+        z-index: 3;
+        margin: 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: color-mix(in srgb, #7f1d1d 88%, transparent);
+        color: #fff;
+        font-size: 13px;
+        text-align: center;
+        pointer-events: none;
       }
       .video-watermark {
         position: absolute;
@@ -140,7 +165,9 @@ export class VideoPlayerComponent implements OnChanges, OnDestroy {
     viewChild<FullscreenLearningToolbarComponent>('fsToolbar');
 
   readonly isFullscreen = signal(false);
+  readonly loadError = signal(false);
   private lastEmit = 0;
+  private resumeApplied = false;
 
   constructor() {
     effect(() => {
@@ -161,13 +188,31 @@ export class VideoPlayerComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['src'] || changes['startAt']) {
-      queueMicrotask(() => {
-        const video = this.videoRef().nativeElement;
-        if (this.startAt() > 0) {
-          video.currentTime = this.startAt();
-        }
-      });
+    if (changes['src']) {
+      this.resumeApplied = false;
+      this.loadError.set(false);
+    }
+  }
+
+  onLoadedMetadata(): void {
+    this.applyResume();
+  }
+
+  onError(): void {
+    this.loadError.set(true);
+  }
+
+  private applyResume(): void {
+    if (this.resumeApplied) return;
+    const video = this.videoRef().nativeElement;
+    const start = clampVideoStartAt(this.startAt(), video.duration);
+    this.resumeApplied = true;
+    if (start > 0) {
+      try {
+        video.currentTime = start;
+      } catch {
+        /* some browsers reject seek until canplay */
+      }
     }
   }
 
@@ -247,20 +292,33 @@ export class VideoPlayerComponent implements OnChanges, OnDestroy {
   }
 
   onTime(): void {
+    const percent = this.pct();
     const now = Date.now();
-    if (now - this.lastEmit < 2000) return;
+    if (percent < 100 && now - this.lastEmit < 2000) return;
     this.lastEmit = now;
+    this.emitProgress();
+  }
+
+  onEnded(): void {
+    this.lastEmit = Date.now();
+    this.emitProgress(true);
+  }
+
+  private emitProgress(ended = false): void {
     const video = this.videoRef().nativeElement;
     this.progress.emit({
-      currentTime: video.currentTime,
-      watchPercentage: this.pct(),
+      currentTime: ended && Number.isFinite(video.duration) ? video.duration : video.currentTime,
+      watchPercentage: this.pct(ended),
       playbackSpeed: video.playbackRate,
     });
   }
 
-  private pct(): number {
+  private pct(ended = false): number {
     const video = this.videoRef().nativeElement;
-    if (!video.duration || !Number.isFinite(video.duration)) return 0;
-    return Math.min(100, Math.round((video.currentTime / video.duration) * 100));
+    return videoWatchPercentage({
+      currentTime: video.currentTime,
+      duration: video.duration,
+      ended: ended || video.ended,
+    });
   }
 }

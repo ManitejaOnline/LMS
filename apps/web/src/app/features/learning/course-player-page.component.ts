@@ -33,6 +33,7 @@ import type {
   PlayerPayload,
 } from '../../core/models/domain.models';
 import { isLessonSequentiallyLocked } from '../../shared/utils/sequential-lessons.util';
+import { videoResumeSeconds } from '../../shared/utils/video-resume.util';
 import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
 
 @Component({
@@ -153,7 +154,7 @@ import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
                     <app-video-player
                       #videoPlayer
                       [src]="mediaUrl(lesson)!"
-                      [startAt]="currentProgress()?.resumePositionSec || 0"
+                      [startAt]="videoStartAt()"
                       [learningPageLabel]="displayLessonTitle(lesson)"
                       [learningTimerLabel]="videoWatchLabel()"
                       [learningPaused]="tabHidden() || protection.forcePaused()"
@@ -904,6 +905,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   readonly pdfInitialPage = signal(1);
   readonly pageProgressByLesson = signal<Record<string, PageProgressDto[]>>({});
   readonly tabHidden = signal(false);
+  readonly videoStartAt = signal(0);
 
   readonly pageLockTooltip =
     'You must spend 1 minute on this page before continuing.';
@@ -969,6 +971,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
         this.syncPageProgress(data.pageProgress ?? []);
         this.activeLessonId.set(data.resumeLessonId || data.lessons[0]?.id || null);
         if (this.activeLessonId()) {
+          this.captureVideoStartAt(this.activeLessonId()!);
           this.tracker.track('LESSON_OPENED', this.activeLessonId()!);
           this.bindPageEngineForActiveLesson();
         }
@@ -1088,6 +1091,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     if (this.isLessonLockedById(lessonId)) return;
     this.viewMode.set('lesson');
     this.activeLessonId.set(lessonId);
+    this.captureVideoStartAt(lessonId);
     this.tracker.track('LESSON_OPENED', lessonId);
     this.pdfCanPrev.set(false);
     this.pdfCanNext.set(false);
@@ -1095,6 +1099,19 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     if (this.outlineOverlay()) {
       this.outlineOpen.set(false);
     }
+  }
+
+  private captureVideoStartAt(lessonId: string): void {
+    const progress = this.progressMap()[lessonId];
+    const lesson = this.payload()?.lessons.find((item) => item.id === lessonId);
+    this.videoStartAt.set(
+      videoResumeSeconds({
+        resumePositionSec: progress?.resumePositionSec,
+        watchPercentage: progress?.watchPercentage,
+        completed: progress?.status === 'COMPLETED',
+        durationSec: lesson?.durationSeconds,
+      }),
+    );
   }
 
   isLessonLocked(lesson: PlayerLessonDto): boolean {
@@ -1236,7 +1253,11 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   }
 
   videoWatchLabel(): string {
-    return `${Math.round(this.currentProgress()?.watchPercentage ?? 0)}% watched`;
+    const progress = this.currentProgress();
+    if (progress?.status === 'COMPLETED' || (progress?.watchPercentage ?? 0) >= 100) {
+      return '100% watched';
+    }
+    return `${Math.round(progress?.watchPercentage ?? 0)}% watched`;
   }
 
   isLastPageInChapter(): boolean {
@@ -1409,7 +1430,11 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
       if (!current) return map;
       return {
         ...map,
-        [lessonId]: { ...current, watchPercentage: event.watchPercentage, resumePositionSec: event.currentTime },
+        [lessonId]: {
+          ...current,
+          watchPercentage: Math.max(current.watchPercentage ?? 0, event.watchPercentage),
+          resumePositionSec: event.currentTime,
+        },
       };
     });
     if (this.canMarkComplete()) {

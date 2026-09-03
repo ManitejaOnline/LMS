@@ -59,8 +59,16 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
         min-width: 0;
         display: flex;
         flex-direction: column;
+        align-items: stretch;
         transition: filter 180ms ease;
         position: relative;
+      }
+      .cp-content > :first-child {
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        width: 100%;
+        height: 100%;
       }
       .cp-root.is-blurred .cp-content {
         filter: blur(14px);
