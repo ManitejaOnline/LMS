@@ -97,6 +97,7 @@ export class ProgramProgressService {
   }
 
   async syncEnrollment(enrollmentId: string): Promise<SyncResult> {
+    await this.ensureLevelCourseAssignments(enrollmentId);
     const before = await this.prisma.levelProgress.findMany({
       where: { enrollmentId, status: LevelProgressStatus.COMPLETED },
       select: { levelId: true },
@@ -163,7 +164,32 @@ export class ProgramProgressService {
               where: { deletedAt: null },
               orderBy: { sortOrder: 'asc' },
               include: {
-                courses: { orderBy: { sortOrder: 'asc' }, include: { course: true } },
+                courses: {
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    course: {
+                      include: {
+                        modules: {
+                          where: { deletedAt: null },
+                          orderBy: { sortOrder: 'asc' },
+                          include: {
+                            lessons: {
+                              where: { deletedAt: null },
+                              orderBy: { sortOrder: 'asc' },
+                              select: {
+                                id: true,
+                                title: true,
+                                type: true,
+                                durationSeconds: true,
+                                sortOrder: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
                 finalAssessment: {
                   where: { deletedAt: null },
                   select: { id: true, status: true, title: true, passingScore: true, maxAttempts: true, questionCount: true },
@@ -178,7 +204,12 @@ export class ProgramProgressService {
     });
     if (!enrollment) throw new NotFoundException('Program enrollment not found');
 
-    const courseIds = enrollment.program.levels.flatMap((level) =>
+    const activeLevels = enrollment.program.levels.map((level) => ({
+      ...level,
+      courses: level.courses.filter((item) => !item.course.deletedAt),
+    }));
+
+    const courseIds = activeLevels.flatMap((level) =>
       level.courses.map((item) => item.courseId),
     );
     const assignments = await this.prisma.courseAssignment.findMany({
@@ -190,7 +221,7 @@ export class ProgramProgressService {
         .map((row) => row.courseId),
     );
 
-    const quizIds = enrollment.program.levels
+    const quizIds = activeLevels
       .map((level) => level.finalAssessment?.id)
       .filter((id): id is string => !!id);
     const passedAttempts = quizIds.length
@@ -203,7 +234,7 @@ export class ProgramProgressService {
 
     let previousCompleted = true;
     const levels = [];
-    for (const [index, level] of enrollment.program.levels.entries()) {
+    for (const [index, level] of activeLevels.entries()) {
       const unlocked = isLevelUnlocked(index, previousCompleted);
       const requiredIds = level.courses.filter((c) => c.isRequired).map((c) => c.courseId);
       const coursesDone = requiredCoursesComplete(requiredIds, completedCourseIds);
@@ -258,6 +289,15 @@ export class ProgramProgressService {
         completedRequiredCount: requiredIds.filter((id) => completedCourseIds.has(id)).length,
         courses: level.courses.map((item) => {
           const assignment = assignments.find((row) => row.courseId === item.courseId);
+          const lessons = item.course.modules.flatMap((module) =>
+            module.lessons.map((lesson) => ({
+              id: lesson.id,
+              title: lesson.title,
+              type: lesson.type,
+              durationSeconds: lesson.durationSeconds,
+              sortOrder: lesson.sortOrder,
+            })),
+          );
           return {
             id: item.id,
             courseId: item.courseId,
@@ -270,6 +310,9 @@ export class ProgramProgressService {
             status: assignment?.status ?? 'NOT_STARTED',
             progressPercent: assignment?.progressPercent ?? 0,
             completed: assignment?.status === AssignmentStatus.COMPLETED,
+            lessons,
+            lessonCount: lessons.length,
+            videoCount: lessons.filter((lesson) => lesson.type === 'VIDEO').length,
           };
         }),
         courseCount: level.courses.length,
@@ -310,6 +353,63 @@ export class ProgramProgressService {
       certificate: enrollment.certificate,
       programCompleted: levels.length > 0 && levels.every((level) => level.completed),
     };
+  }
+
+  private async ensureLevelCourseAssignments(enrollmentId: string): Promise<void> {
+    const enrollment = await this.prisma.programEnrollment.findFirst({
+      where: { id: enrollmentId, deletedAt: null },
+      select: {
+        id: true,
+        userId: true,
+        program: {
+          select: {
+            levels: {
+              where: { deletedAt: null },
+              select: {
+                courses: {
+                  select: {
+                    courseId: true,
+                    course: { select: { deletedAt: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!enrollment) return;
+
+    for (const level of enrollment.program.levels) {
+      for (const item of level.courses) {
+        if (item.course.deletedAt) continue;
+        const current = await this.prisma.courseAssignment.findUnique({
+          where: {
+            courseId_userId: { courseId: item.courseId, userId: enrollment.userId },
+          },
+        });
+        if (!current) {
+          await this.prisma.courseAssignment.create({
+            data: {
+              courseId: item.courseId,
+              userId: enrollment.userId,
+              programEnrollmentId: enrollment.id,
+              status: AssignmentStatus.NOT_STARTED,
+            },
+          });
+        } else if (current.deletedAt) {
+          await this.prisma.courseAssignment.update({
+            where: { id: current.id },
+            data: { deletedAt: null, programEnrollmentId: enrollment.id },
+          });
+        } else if (current.programEnrollmentId !== enrollment.id) {
+          await this.prisma.courseAssignment.update({
+            where: { id: current.id },
+            data: { programEnrollmentId: enrollment.id },
+          });
+        }
+      }
+    }
   }
 
   async getCertificateOrThrow(enrollmentId: string, userId: string) {

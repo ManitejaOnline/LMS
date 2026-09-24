@@ -10,6 +10,15 @@ export type EvaluatedLearnerCourse = {
   status: string;
   progressPercent: number;
   completed: boolean;
+  lessons?: Array<{
+    id: string;
+    title: string;
+    type: string;
+    durationSeconds: number | null;
+    sortOrder: number;
+  }>;
+  lessonCount?: number;
+  videoCount?: number;
 };
 
 export type EvaluatedLearnerLevel = {
@@ -156,6 +165,10 @@ export function toLearnerLevelDetail(view: EvaluatedProgramView, levelId: string
       isRequired: course.isRequired,
       assignmentId: locked ? null : course.assignmentId,
       completed: course.completed,
+      sortOrder: course.sortOrder,
+      lessons: course.lessons ?? [],
+      lessonCount: course.lessonCount ?? course.lessons?.length ?? 0,
+      videoCount: course.videoCount ?? 0,
     })),
   };
 }

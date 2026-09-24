@@ -37,6 +37,9 @@ const view = {
           status: 'COMPLETED',
           progressPercent: 100,
           completed: true,
+          lessons: [{ id: 'les1', title: 'Welcome video', type: 'VIDEO', durationSeconds: 120, sortOrder: 0 }],
+          lessonCount: 1,
+          videoCount: 1,
         },
       ],
       finalAssessment: null,
@@ -66,6 +69,9 @@ const view = {
           status: 'NOT_STARTED',
           progressPercent: 0,
           completed: false,
+          lessons: [],
+          lessonCount: 0,
+          videoCount: 0,
         },
         {
           id: 'lc3',
@@ -79,6 +85,9 @@ const view = {
           status: 'NOT_STARTED',
           progressPercent: 0,
           completed: false,
+          lessons: [],
+          lessonCount: 0,
+          videoCount: 0,
         },
       ],
       finalAssessment: null,
@@ -108,6 +117,8 @@ describe('learner level view', () => {
     expect(detail?.courses).toHaveLength(1);
     expect(detail?.courses[0].isLocked).toBe(false);
     expect(detail?.courses[0].assignmentId).toBe('a1');
+    expect(detail?.courses[0].lessons).toHaveLength(1);
+    expect(detail?.courses[0].videoCount).toBe(1);
     expect(detail?.level.status).toBe('COMPLETED');
   });
 });

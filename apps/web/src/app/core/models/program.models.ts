@@ -115,6 +115,14 @@ export interface ProgramProgressView {
   courseIds: string[];
 }
 
+export interface LearnerLevelLessonDetail {
+  id: string;
+  title: string;
+  type: string;
+  durationSeconds: number | null;
+  sortOrder: number;
+}
+
 export interface LearnerLevelCourseDetail {
   id: string;
   levelCourseId: string;
@@ -127,6 +135,10 @@ export interface LearnerLevelCourseDetail {
   isRequired: boolean;
   assignmentId: string | null;
   completed: boolean;
+  sortOrder?: number;
+  lessons: LearnerLevelLessonDetail[];
+  lessonCount: number;
+  videoCount: number;
 }
 
 export interface LearnerLevelDetail {
