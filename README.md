@@ -36,6 +36,8 @@ Default admin: `superadmin@zebl.local` / `ChangeMe!SuperAdmin1`
 
 ## Production on Vercel (frontend + backend)
 
+Full publish handoff for SR / DevOps: [`docs/PUBLISH.md`](docs/PUBLISH.md).
+
 Use **two Vercel projects** from the same GitHub repo. Vercel runs Nest as a [Fluid compute](https://vercel.com/docs/frameworks/backend/nestjs) function and the Angular app as static files.
 
 ```text
