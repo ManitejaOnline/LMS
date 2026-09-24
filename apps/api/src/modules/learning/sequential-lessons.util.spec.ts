@@ -57,3 +57,25 @@ describe('sequential unlock with assessments', () => {
     expect(firstUnlockedIncompleteLessonId(lessons, ['l1'], ['l1'])).toBe('l2');
   });
 });
+
+describe('video lessons stay unlocked', () => {
+  const videos: SequenceLesson[] = [
+    { id: 'v1', hasAssessment: false, type: 'VIDEO' },
+    { id: 'v2', hasAssessment: false, type: 'VIDEO' },
+    { id: 'v3', hasAssessment: true, type: 'VIDEO' },
+  ];
+
+  it('keeps every video open in the outline', () => {
+    expect(isLessonSequentiallyLocked(videos, 'v1', [])).toBe(false);
+    expect(isLessonSequentiallyLocked(videos, 'v2', [])).toBe(false);
+    expect(isLessonSequentiallyLocked(videos, 'v3', [])).toBe(false);
+  });
+
+  it('does not let a video block a following PDF', () => {
+    const mixed: SequenceLesson[] = [
+      { id: 'v1', hasAssessment: false, type: 'VIDEO' },
+      { id: 'p1', hasAssessment: false, type: 'PDF' },
+    ];
+    expect(isLessonSequentiallyLocked(mixed, 'p1', [])).toBe(false);
+  });
+});

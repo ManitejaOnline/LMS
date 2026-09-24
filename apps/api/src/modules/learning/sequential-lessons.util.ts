@@ -1,6 +1,8 @@
 export type SequenceLesson = {
   id: string;
   hasAssessment: boolean;
+  /** When VIDEO, the outline never locks this lesson for sequential gating. */
+  type?: 'PDF' | 'VIDEO' | 'QUIZ' | string;
 };
 
 function asSet(ids: Iterable<string>): Set<string> {
@@ -8,17 +10,19 @@ function asSet(ids: Iterable<string>): Set<string> {
 }
 
 export function toSequenceLessons(
-  lessons: Array<{ id: string; hasAssessment?: boolean }>,
+  lessons: Array<{ id: string; hasAssessment?: boolean; type?: string }>,
 ): SequenceLesson[] {
   return lessons.map((lesson) => ({
     id: lesson.id,
     hasAssessment: !!lesson.hasAssessment,
+    type: lesson.type,
   }));
 }
 
 /**
  * Previous lesson is cleared when it is completed AND, if it has a
  * published assessment, that assessment has been passed.
+ * Video lessons never block later items (they stay freely open).
  */
 export function isPreviousGateCleared(
   lessons: SequenceLesson[],
@@ -29,6 +33,7 @@ export function isPreviousGateCleared(
   if (index <= 0) return true;
   const previous = lessons[index - 1];
   if (!previous) return false;
+  if (previous.type === 'VIDEO') return true;
   const completed = asSet(completedLessonIds);
   if (!completed.has(previous.id)) return false;
   if (previous.hasAssessment && !asSet(passedAssessmentLessonIds).has(previous.id)) {
@@ -45,6 +50,8 @@ export function isLessonSequentiallyLocked(
 ): boolean {
   const index = lessons.findIndex((lesson) => lesson.id === lessonId);
   if (index < 0) return true;
+  const current = lessons[index];
+  if (current?.type === 'VIDEO') return false;
   return !isPreviousGateCleared(
     lessons,
     index,

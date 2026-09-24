@@ -1,6 +1,8 @@
 export type SequenceLesson = {
   id: string;
   hasAssessment: boolean;
+  /** When VIDEO, the outline never locks this lesson for sequential gating. */
+  type?: 'PDF' | 'VIDEO' | 'QUIZ' | string;
 };
 
 function asSet(ids: Iterable<string>): Set<string> {
@@ -16,6 +18,7 @@ export function isPreviousGateCleared(
   if (index <= 0) return true;
   const previous = lessons[index - 1];
   if (!previous) return false;
+  if (previous.type === 'VIDEO') return true;
   const completed = asSet(completedLessonIds);
   if (!completed.has(previous.id)) return false;
   if (previous.hasAssessment && !asSet(passedAssessmentLessonIds).has(previous.id)) {
@@ -32,6 +35,8 @@ export function isLessonSequentiallyLocked(
 ): boolean {
   const index = lessons.findIndex((lesson) => lesson.id === lessonId);
   if (index < 0) return true;
+  const current = lessons[index];
+  if (current?.type === 'VIDEO') return false;
   return !isPreviousGateCleared(
     lessons,
     index,

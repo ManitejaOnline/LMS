@@ -27,4 +27,15 @@ describe('isLessonSequentiallyLocked', () => {
     expect(isLessonSequentiallyLocked(withAssessment, 'b', ['a'], [])).toBe(true);
     expect(isLessonSequentiallyLocked(withAssessment, 'b', ['a'], ['a'])).toBe(false);
   });
+
+  it('keeps all video lessons unlocked in the outline', () => {
+    const videos: SequenceLesson[] = [
+      { id: 'a', hasAssessment: false, type: 'VIDEO' },
+      { id: 'b', hasAssessment: false, type: 'VIDEO' },
+      { id: 'c', hasAssessment: false, type: 'VIDEO' },
+    ];
+    expect(isLessonSequentiallyLocked(videos, 'a', [])).toBe(false);
+    expect(isLessonSequentiallyLocked(videos, 'b', [])).toBe(false);
+    expect(isLessonSequentiallyLocked(videos, 'c', [])).toBe(false);
+  });
 });

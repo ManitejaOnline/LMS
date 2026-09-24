@@ -1458,7 +1458,11 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
       lessons.filter((lesson) => lesson.assessment?.passed).map((lesson) => lesson.id),
     );
     return isLessonSequentiallyLocked(
-      lessons.map((lesson) => ({ id: lesson.id, hasAssessment: !!lesson.assessment })),
+      lessons.map((lesson) => ({
+        id: lesson.id,
+        hasAssessment: !!lesson.assessment,
+        type: lesson.type,
+      })),
       lessonId,
       completed,
       passed,

@@ -29,6 +29,7 @@ export class SequentialAccessService {
           orderBy: { sortOrder: 'asc' },
           select: {
             id: true,
+            type: true,
             quiz: {
               select: { id: true, status: true, deletedAt: true },
             },
@@ -40,6 +41,7 @@ export class SequentialAccessService {
     const lessons: SequenceLesson[] = modules.flatMap((mod) =>
       mod.lessons.map((lesson) => ({
         id: lesson.id,
+        type: lesson.type,
         hasAssessment:
           !!lesson.quiz &&
           !lesson.quiz.deletedAt &&
