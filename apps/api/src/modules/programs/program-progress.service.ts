@@ -236,7 +236,8 @@ export class ProgramProgressService {
     let previousCompleted = true;
     const levels = [];
     for (const [index, level] of activeLevels.entries()) {
-      const unlocked = isLevelUnlocked(index, previousCompleted);
+      const unlocked = true; // all levels open
+      void isLevelUnlocked(index, previousCompleted);
       // Prefer required courses; if none flagged, all courses in the level gate unlock.
       const requiredIds = levelGateCourseIds(
         level.courses.map((c) => ({ courseId: c.courseId, isRequired: c.isRequired })),
@@ -254,7 +255,7 @@ export class ProgramProgressService {
           })
         : coursesDone;
       const available = unlocked && !completed;
-      const locked = !unlocked;
+      const locked = false;
       previousCompleted = completed;
 
       await this.prisma.levelProgress.upsert({
@@ -334,8 +335,8 @@ export class ProgramProgressService {
                 maxAttempts: level.finalAssessment!.maxAttempts,
                 questionCount: level.finalAssessment!.questionCount,
                 passed: finalPassed,
-                available: unlocked && coursesDone && !finalPassed,
-                locked: locked || !coursesDone,
+                available: coursesDone && !finalPassed,
+                locked: false,
               }
             : null,
       });

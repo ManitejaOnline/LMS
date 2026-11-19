@@ -7,10 +7,10 @@ import {
 } from './program-rules';
 
 describe('program level unlock', () => {
-  it('unlocks only the first level initially', () => {
+  it('keeps every level unlocked', () => {
     expect(isLevelUnlocked(0, false)).toBe(true);
-    expect(isLevelUnlocked(1, false)).toBe(false);
-    expect(isLevelUnlocked(1, true)).toBe(true);
+    expect(isLevelUnlocked(1, false)).toBe(true);
+    expect(isLevelUnlocked(2, true)).toBe(true);
   });
 
   it('requires every required course', () => {
@@ -32,11 +32,6 @@ describe('program level unlock', () => {
         { courseId: 'b', isRequired: false },
       ]),
     ).toEqual(['a']);
-  });
-
-  it('unlocks the next level after previous courses complete', () => {
-    const level1Done = requiredCoursesComplete(['c1'], ['c1']);
-    expect(isLevelUnlocked(1, level1Done)).toBe(true);
   });
 
   it('requires final assessment pass when configured', () => {

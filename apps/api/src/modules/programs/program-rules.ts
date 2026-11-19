@@ -4,8 +4,9 @@ export type LevelGate = {
   requiredCourseIds: string[];
 };
 
-export function isLevelUnlocked(index: number, previousCompleted: boolean): boolean {
-  return index === 0 || previousCompleted;
+export function isLevelUnlocked(_index: number, _previousCompleted: boolean): boolean {
+  // All program levels are open; no sequential lock.
+  return true;
 }
 
 export function requiredCoursesComplete(
