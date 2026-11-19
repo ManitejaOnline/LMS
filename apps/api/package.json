@@ -1,8 +1,8 @@
 {
   "name": "@zebl/api",
   "version": "0.1.0",
-  "description": "Zebl Corporate Training Portal — NestJS API foundation",
-  "author": "Zebl",
+  "description": "VEB Healthcare Private LMS — NestJS API foundation",
+  "author": "VEB Healthcare Private",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

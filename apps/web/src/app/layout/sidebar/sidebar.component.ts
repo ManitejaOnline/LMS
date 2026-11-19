@@ -34,7 +34,7 @@ import { SidebarStateService } from './sidebar-state.service';
         </button>
         <img
           src="brand/logo.png"
-          alt="Zebl India"
+          alt="VEB Healthcare Private"
           class="brand-logo"
           [attr.aria-hidden]="collapsed() ? true : null"
         />
@@ -153,13 +153,15 @@ import { SidebarStateService } from './sidebar-state.service';
         display: block;
         width: auto;
         height: auto;
-        max-width: 160px;
-        max-height: 42px;
+        max-width: 168px;
+        max-height: 44px;
         object-fit: contain;
         object-position: left center;
         flex: 0 0 auto;
-        background: none;
+        background: #000;
         border: 0;
+        border-radius: 6px;
+        padding: 4px 8px;
         box-shadow: none;
       }
       .collapsed .brand-logo {

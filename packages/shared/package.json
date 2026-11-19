@@ -2,7 +2,7 @@
   "name": "@zebl/shared",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared contracts and utilities for Zebl Corporate Training Portal",
+  "description": "Shared contracts and utilities for VEB Healthcare Private LMS",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

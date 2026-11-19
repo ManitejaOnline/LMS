@@ -313,8 +313,11 @@ export class MyLearningPageComponent implements OnInit {
   }
 
   private maybeShowStoredLevelComplete(): void {
-    const raw = sessionStorage.getItem('zebl-level-complete');
+    const raw =
+      sessionStorage.getItem('veb-level-complete') ??
+      sessionStorage.getItem('zebl-level-complete');
     if (!raw) return;
+    sessionStorage.removeItem('veb-level-complete');
     sessionStorage.removeItem('zebl-level-complete');
     try {
       const event = JSON.parse(raw) as { newlyCompletedLevelTitle?: string; nextLevelTitle?: string };

@@ -1359,7 +1359,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     this.completedLevelTitle = event.newlyCompletedLevelTitle;
     this.nextLevelTitle = event.nextLevelTitle ?? '';
     this.levelCompleteVisible = true;
-    sessionStorage.setItem('zebl-level-complete', JSON.stringify(event));
+    sessionStorage.setItem('veb-level-complete', JSON.stringify(event));
   }
 
   onPdfPage(event: {

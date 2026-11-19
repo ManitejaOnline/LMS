@@ -100,8 +100,8 @@ import { AuthLayoutComponent } from './auth-layout.component';
       }
       :host ::ng-deep .auth-submit.p-button {
         min-height: 44px;
-        background: #51459e;
-        border-color: #51459e;
+        background: #2a4f7d;
+        border-color: #2a4f7d;
       }
     `,
   ],

@@ -5,8 +5,8 @@ import { Component } from '@angular/core';
   standalone: true,
   template: `
     <div class="auth-shell">
-      <section class="auth-brand" aria-label="Zebl India">
-        <img src="brand/logo.png" alt="Zebl India" class="auth-logo" />
+      <section class="auth-brand" aria-label="VEB Healthcare Private">
+        <img src="brand/logo.png" alt="VEB Healthcare Private" class="auth-logo" />
         <p class="tagline">Learning Management System</p>
       </section>
       <section class="auth-main">
@@ -53,7 +53,7 @@ import { Component } from '@angular/core';
         place-items: center;
         padding: 24px;
         background:
-          radial-gradient(1200px 400px at 80% -10%, color-mix(in srgb, #51459e 18%, transparent), transparent),
+          radial-gradient(1200px 400px at 80% -10%, color-mix(in srgb, #2a4f7d 18%, transparent), transparent),
           #f3f4f6;
       }
       .auth-card {

@@ -23,7 +23,7 @@ import { AuthLayoutComponent } from './auth-layout.component';
   template: `
     <app-auth-layout>
       <h1>Sign in</h1>
-      <p class="lede">Use your work email to continue to Zebl India LMS.</p>
+      <p class="lede">Use your work email to continue to VEB Healthcare Private.</p>
 
       @if (error()) {
         <p-message severity="error" [text]="error()!" styleClass="w-full mb-4" />
@@ -115,8 +115,8 @@ import { AuthLayoutComponent } from './auth-layout.component';
       }
       :host ::ng-deep .auth-submit.p-button {
         min-height: 44px;
-        background: #51459e;
-        border-color: #51459e;
+        background: #2a4f7d;
+        border-color: #2a4f7d;
       }
       :host ::ng-deep .auth-submit.p-button:not(:disabled):hover {
         background: #433884;

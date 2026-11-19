@@ -1,6 +1,6 @@
 # Architecture & Code Review
 
-**Product:** Zebl Corporate Training Portal  
+**Product:** VEB Healthcare Private LMS  
 **Document type:** Enterprise architecture and code quality review  
 **Audience:** Engineering leadership, security, and product stakeholders  
 **Review stance:** Production-readiness assessment for enterprise customers  

@@ -1,4 +1,4 @@
-# Zebl India LMS — Publish Guide
+# VEB Healthcare Private LMS — Publish Guide
 
 Hand-off for whoever is publishing or moving this app to another host.
 
@@ -90,7 +90,7 @@ npx prisma db seed
 
 Default seed admin (change in production):
 
-- Email: `superadmin@zebl.local`
+- Email: `superadmin@veb.local`
 - Password: `ChangeMe!SuperAdmin1`
 
 ---

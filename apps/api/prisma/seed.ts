@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = (
-    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@zebl.local'
+    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@veb.local'
   ).toLowerCase();
   const password =
     process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!SuperAdmin1';
@@ -22,6 +22,20 @@ async function main() {
   });
 
   const passwordHash = await bcrypt.hash(password, saltRounds);
+
+  // Migrate legacy Zebl seed email if still present.
+  const legacy = await prisma.user.findUnique({
+    where: { email: 'superadmin@zebl.local' },
+  });
+  if (legacy && email !== 'superadmin@zebl.local') {
+    const taken = await prisma.user.findUnique({ where: { email } });
+    if (!taken) {
+      await prisma.user.update({
+        where: { id: legacy.id },
+        data: { email },
+      });
+    }
+  }
 
   const admin = await prisma.user.upsert({
     where: { email },

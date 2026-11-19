@@ -429,14 +429,14 @@ export class ProgramProgressService {
       where: { id: enrollmentId },
       include: { user: true, program: true },
     });
-    const code = `ZBL-${randomBytes(4).toString('hex').toUpperCase()}`;
+    const code = `VEB-${randomBytes(4).toString('hex').toUpperCase()}`;
     const cert = await this.prisma.programCertificate.create({
       data: {
         enrollmentId,
         certificateCode: code,
         employeeName: `${enrollment.user.firstName} ${enrollment.user.lastName}`.trim(),
         programName: enrollment.program.name,
-        organizationName: process.env.ORGANIZATION_NAME || 'Zebl',
+        organizationName: process.env.ORGANIZATION_NAME || 'VEB Healthcare Private',
       },
     });
     await this.audit.write({

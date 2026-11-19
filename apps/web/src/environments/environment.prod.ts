@@ -5,7 +5,7 @@ const API_ORIGIN = 'https://zebl-lms.vercel.app';
 
 export const environment = {
   production: true,
-  appName: 'Zebl India LMS',
+  appName: 'VEB Healthcare Private',
   apiBaseUrl: `${API_ORIGIN}/api/v1`,
   mediaBaseUrl: API_ORIGIN,
 };

@@ -1,4 +1,4 @@
-# Zebl Corporate Training Portal
+# VEB Healthcare Private LMS
 
 Internal enterprise HR onboarding / mandatory training portal (not a public course marketplace).
 
@@ -30,7 +30,7 @@ npm run dev:web
 - Swagger: http://localhost:3000/docs  
 - Web: http://localhost:4200  
 
-Default admin: `superadmin@zebl.local` / `ChangeMe!SuperAdmin1`
+Default admin: `superadmin@veb.local` / `ChangeMe!SuperAdmin1`
 
 ---
 

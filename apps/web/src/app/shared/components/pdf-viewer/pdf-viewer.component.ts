@@ -150,7 +150,7 @@ type FitMode = 'width' | 'page' | 'custom';
       >
         <div class="pdf-page">
           <canvas #canvas></canvas>
-          <div class="pdf-watermark" aria-hidden="true">Zebl India LMS</div>
+          <div class="pdf-watermark" aria-hidden="true">VEB Healthcare Private</div>
         </div>
       </div>
 

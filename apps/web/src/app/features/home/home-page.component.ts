@@ -9,8 +9,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
   imports: [PageHeaderComponent, Button, RouterLink],
   template: `
     <app-page-header
-      eyebrow="Zebl India"
-      title="Zebl India LMS"
+      eyebrow="VEB Healthcare Private"
+      title="VEB Healthcare Private"
       subtitle="Enterprise internal onboarding platform foundation is ready for the next implementation phases."
     />
 

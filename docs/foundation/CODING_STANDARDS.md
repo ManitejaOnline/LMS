@@ -1,4 +1,4 @@
-# Coding Standards — Zebl Corporate Training Portal
+# Coding Standards — VEB Healthcare Private LMS
 
 ## General
 

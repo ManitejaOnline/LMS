@@ -41,7 +41,7 @@ export const authConfig = registerAs('auth', () => ({
     process.env.PASSWORD_RESET_EXPIRES_MINUTES ?? 30,
   ),
   seedSuperAdminEmail:
-    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@zebl.local',
+    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@veb.local',
   seedSuperAdminPassword:
     process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe!SuperAdmin1',
 }));

@@ -2,10 +2,11 @@
 @import "primeicons/primeicons.css";
 
 :root {
-  /* Color — Zebl India brand */
-  --ctp-primary: #51459e;
-  --ctp-primary-soft: #efeaf8;
-  --ctp-primary-hover: #433884;
+  /* Color — VEB Healthcare Private brand */
+  --ctp-primary: #2a4f7d;
+  --ctp-primary-soft: #eef3f9;
+  --ctp-primary-hover: #224066;
+  --ctp-accent: #f4811f;
   --ctp-teal: #139f8a;
   --ctp-success: #22c55e;
   --ctp-success-soft: #ecfdf5;

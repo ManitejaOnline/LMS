@@ -46,7 +46,7 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(30),
-  SEED_SUPER_ADMIN_EMAIL: z.string().email().default('superadmin@zebl.local'),
+  SEED_SUPER_ADMIN_EMAIL: z.string().email().default('superadmin@veb.local'),
   SEED_SUPER_ADMIN_PASSWORD: z.string().min(8).default('ChangeMe!SuperAdmin1'),
 
   STORAGE_ROOT_DIR: z.string().min(1).default('uploads'),

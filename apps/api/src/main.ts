@@ -79,9 +79,9 @@ async function bootstrap(): Promise<void> {
   const swaggerEnabled = configService.get<boolean>('swagger.enabled');
   if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Zebl Training Portal API')
+      .setTitle('VEB Healthcare Private LMS API')
       .setDescription(
-        'Zebl Training Portal API — Auth, Users, and Course Management.',
+        'VEB Healthcare Private LMS API — Auth, Users, and Course Management.',
       )
       .setVersion('0.3.0')
       .addBearerAuth(

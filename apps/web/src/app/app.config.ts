@@ -13,20 +13,20 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 
-const ZeblPreset = definePreset(Aura, {
+const VebPreset = definePreset(Aura, {
   semantic: {
     primary: {
-      50: '#f4f2fb',
-      100: '#e8e4f6',
-      200: '#d1c9ed',
-      300: '#b3a6e0',
-      400: '#8b7ac9',
-      500: '#6b5bb3',
-      600: '#51459e',
-      700: '#433884',
-      800: '#362d6b',
-      900: '#2c2656',
-      950: '#1a1733',
+      50: '#eef3f9',
+      100: '#d9e4f1',
+      200: '#b3c9e3',
+      300: '#7fa3cc',
+      400: '#4f7db3',
+      500: '#335f96',
+      600: '#2a4f7d',
+      700: '#224066',
+      800: '#1b334f',
+      900: '#15283d',
+      950: '#0d1826',
     },
   },
 });
@@ -40,7 +40,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     providePrimeNG({
       theme: {
-        preset: ZeblPreset,
+        preset: VebPreset,
         options: {
           darkModeSelector: '.dark',
         },

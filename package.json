@@ -2,7 +2,7 @@
   "name": "zebl-lms",
   "version": "0.1.0",
   "private": true,
-  "description": "Enterprise Corporate Training Portal — monorepo foundation",
+  "description": "VEB Healthcare Private LMS — monorepo foundation",
   "workspaces": [
     "apps/*",
     "packages/*"

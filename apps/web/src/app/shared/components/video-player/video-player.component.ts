@@ -55,7 +55,7 @@ import { clampVideoStartAt, videoWatchPercentage } from '../../utils/video-resum
         @if (loadError()) {
           <p class="video-error">This video could not be loaded. Refresh the page and try again.</p>
         }
-        <div class="video-watermark" aria-hidden="true">Zebl India</div>
+        <div class="video-watermark" aria-hidden="true">VEB Healthcare Private</div>
       </div>
     </div>
   `,

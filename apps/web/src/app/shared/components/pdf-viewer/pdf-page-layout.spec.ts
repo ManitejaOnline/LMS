@@ -13,7 +13,7 @@ describe('pdf page watermark layout', () => {
     canvas.style.height = '500px';
     const watermark = document.createElement('div');
     watermark.className = 'pdf-watermark';
-    watermark.textContent = 'Zebl India LMS';
+    watermark.textContent = 'VEB Healthcare Private';
     watermark.style.cssText =
       'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-20deg);pointer-events:none;';
     page.appendChild(canvas);
