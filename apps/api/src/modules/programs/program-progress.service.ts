@@ -11,7 +11,6 @@ import { AuditActions } from '../../infrastructure/audit/audit.constants';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import {
   isFinalLevelComplete,
-  isLevelUnlocked,
   levelGateCourseIds,
   requiredCoursesComplete,
 } from './program-rules';
@@ -236,8 +235,6 @@ export class ProgramProgressService {
     let previousCompleted = true;
     const levels = [];
     for (const [index, level] of activeLevels.entries()) {
-      const unlocked = true; // all levels open
-      void isLevelUnlocked(index, previousCompleted);
       // Prefer required courses; if none flagged, all courses in the level gate unlock.
       const requiredIds = levelGateCourseIds(
         level.courses.map((c) => ({ courseId: c.courseId, isRequired: c.isRequired })),
@@ -254,7 +251,7 @@ export class ProgramProgressService {
             finalAssessmentPassed: finalPassed,
           })
         : coursesDone;
-      const available = unlocked && !completed;
+      const available = !completed;
       const locked = false;
       previousCompleted = completed;
 
