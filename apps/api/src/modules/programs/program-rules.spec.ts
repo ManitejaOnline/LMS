@@ -1,6 +1,7 @@
 import {
   isFinalLevelComplete,
   isLevelUnlocked,
+  levelGateCourseIds,
   requiredCoursesComplete,
   validateProgramPublish,
 } from './program-rules';
@@ -16,6 +17,26 @@ describe('program level unlock', () => {
     expect(requiredCoursesComplete(['a', 'b'], ['a'])).toBe(false);
     expect(requiredCoursesComplete(['a', 'b'], ['a', 'b'])).toBe(true);
     expect(requiredCoursesComplete([], ['a'])).toBe(false);
+  });
+
+  it('falls back to all courses when none are marked required', () => {
+    expect(
+      levelGateCourseIds([
+        { courseId: 'a', isRequired: false },
+        { courseId: 'b', isRequired: false },
+      ]),
+    ).toEqual(['a', 'b']);
+    expect(
+      levelGateCourseIds([
+        { courseId: 'a', isRequired: true },
+        { courseId: 'b', isRequired: false },
+      ]),
+    ).toEqual(['a']);
+  });
+
+  it('unlocks the next level after previous courses complete', () => {
+    const level1Done = requiredCoursesComplete(['c1'], ['c1']);
+    expect(isLevelUnlocked(1, level1Done)).toBe(true);
   });
 
   it('requires final assessment pass when configured', () => {

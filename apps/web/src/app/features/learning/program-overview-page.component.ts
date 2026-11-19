@@ -52,9 +52,10 @@ import {
           </a>
         }
       </section>
+      <h2 class="levels-heading">All levels</h2>
       <div class="levels">
         @for (level of prog.levels; track level.id) {
-          <a [routerLink]="levelRoute(prog.programId, level.id)" class="level-card" [class.locked]="level.locked">
+          <a [routerLink]="levelRoute(prog.programId, level.id)" class="level-card" [class.locked]="level.locked" [class.done]="level.completed">
             <div>
               <p class="eyebrow">{{ levelEyebrow(level) }}</p>
               <h3>{{ level.title }}</h3>
@@ -64,7 +65,7 @@ import {
                 {{ levelState(level) }}
               </p>
             </div>
-            <span class="open">View Level →</span>
+            <span class="open">{{ level.locked ? 'Locked' : level.completed ? 'Review' : 'Open' }} →</span>
           </a>
         }
       </div>
@@ -75,13 +76,19 @@ import {
       .back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: var(--s3); color: var(--ctp-primary); text-decoration: none; }
       .panel { padding: 18px; margin-bottom: var(--ctp-section-gap); display: grid; gap: 12px; }
       .head { display: flex; justify-content: space-between; gap: 12px; }
-      .levels { display: grid; gap: 12px; }
+      .levels-heading { margin: 0 0 12px; font-size: 16px; }
+      .levels {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
       .level-card {
         display: flex; justify-content: space-between; align-items: center; gap: 12px;
         border: 1px solid var(--ctp-border); border-radius: var(--ctp-radius); padding: 16px;
-        min-height: 88px; text-decoration: none; color: inherit;
+        min-height: 120px; text-decoration: none; color: inherit; background: #fff;
       }
       .level-card.locked { opacity: 0.9; background: #fafafa; }
+      .level-card.done { border-color: #b7e4c7; }
       .eyebrow { margin: 0; font-size: 14px; letter-spacing: 0.06em; color: var(--ctp-muted); font-weight: 600; }
       h3 { margin: 2px 0 0; font-size: 16px; }
       .progress-label { margin: 0; font-size: 13px; color: var(--ctp-muted); }
@@ -101,7 +108,7 @@ import {
       @media (max-width: 720px) {
         .head, .level-card { flex-direction: column; align-items: stretch; }
         .open { width: 100%; }
-        .levels { display: flex; flex-direction: column; }
+        .levels { grid-template-columns: 1fr; }
       }
     `,
   ],

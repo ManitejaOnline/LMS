@@ -3,7 +3,6 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Button } from 'primeng/button';
-import { ProgressBar } from 'primeng/progressbar';
 import { Message } from 'primeng/message';
 import { Dialog } from 'primeng/dialog';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -13,14 +12,14 @@ import { StatCardComponent } from '../../shared/components/stat-card/stat-card.c
 import { LearningApiService } from '../../core/http/learning-api.service';
 import { ProgramsApiService } from '../../core/http/programs-api.service';
 import type { CourseAssignmentDto, LearningDashboardDto } from '../../core/models/domain.models';
-import type { ProgramProgressView } from '../../core/models/program.models';
+import type { LearnerLevelSummary, ProgramProgressView } from '../../core/models/program.models';
 import {
   currentProgramLevel,
   levelLabel,
-  levelRoute,
   programRoute,
   standaloneAssignments,
 } from '../../shared/utils/program-progress.util';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-progress-page',
@@ -32,7 +31,6 @@ import {
     StatCardComponent,
     RouterLink,
     Button,
-    ProgressBar,
     Message,
     Dialog,
     DatePipe,
@@ -40,7 +38,7 @@ import {
   template: `
     <app-page-header
       title="Progress"
-      subtitle="Track completion across your mandatory training."
+      subtitle="Your training programs and courses."
     />
 
     @if (error()) {
@@ -57,87 +55,78 @@ import {
         <app-stat-card label="Overdue" [value]="dash().overdue" icon="pi pi-exclamation-triangle" tone="danger" />
       </div>
 
-      @for (program of programs(); track program.enrollmentId) {
-        <section class="ctp-card program mb">
-          <div class="program-head">
-            <div>
-              <h2 class="ctp-section-title">
-                <a [routerLink]="programRoute(program.programId)" class="program-link">{{ program.programName }}</a>
-              </h2>
+      @if (!programs().length && !assignments().length) {
+        <p class="muted empty">No training assigned yet. Contact your administrator.</p>
+      } @else {
+        <div class="tile-grid">
+          @for (program of programs(); track program.enrollmentId) {
+            <a [routerLink]="programRoute(program.programId)" class="tile program-tile">
+              <div class="tile-top">
+                <app-status-badge [status]="program.status" />
+                <span class="levels-pill">{{ program.levels.length }} levels</span>
+              </div>
+              <h2>{{ program.programName }}</h2>
               <p class="muted">
                 {{ program.completedCourses }} / {{ program.totalCourses }} courses · {{ program.progressPercent }}%
               </p>
               @if (currentLevel(program); as current) {
-                <p class="muted">Current: {{ levelLabel(current) }}</p>
+                <p class="current">Current: {{ levelLabel(current) }}</p>
               }
-            </div>
-            <div class="program-actions">
-              <app-status-badge [status]="program.status" />
-              @if (currentLevel(program); as current) {
-                <a [routerLink]="levelRoute(program.programId, current.id)" class="no-underline">
-                  <p-button label="Continue" size="small" />
-                </a>
-              } @else {
-                <a [routerLink]="programRoute(program.programId)" class="no-underline">
-                  <p-button label="Open" size="small" [outlined]="true" />
-                </a>
-              }
-            </div>
-          </div>
-          <div class="bar"><span [style.width.%]="program.progressPercent"></span></div>
-        </section>
-      }
+              <div class="level-chips" aria-label="Levels">
+                @for (level of program.levels; track level.id) {
+                  <span class="chip" [class.locked]="level.locked" [class.done]="level.completed" [class.now]="isCurrent(program, level)">
+                    {{ level.isFinal ? 'Final' : 'L' + level.number }}
+                    @if (level.locked) { · Locked }
+                    @else if (level.completed) { · Done }
+                    @else if (isCurrent(program, level)) { · Current }
+                  </span>
+                }
+              </div>
+              <div class="bar"><span [style.width.%]="program.progressPercent"></span></div>
+              <span class="cta">View levels →</span>
+            </a>
+          }
 
-      <section class="ctp-card panel">
-        <h2 class="ctp-section-title">Course progress</h2>
-        <table class="ctp-data-table">
-          <thead>
-            <tr>
-              <th>Course</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Due</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (item of assignments(); track item.id) {
-              <tr>
-                <td>
-                  <div class="strong">{{ item.course.title }}</div>
-                  <div class="ctp-muted tiny">{{ item.course.code }}</div>
-                </td>
-                <td><app-status-badge [status]="item.status" /></td>
-                <td class="prog">
-                  <p-progressBar [value]="item.progressPercent" [showValue]="false" styleClass="h-prog" />
-                  <span>{{ item.progressPercent }}%</span>
-                </td>
-                <td>{{ item.dueAt ? (item.dueAt | date: 'mediumDate') : '—' }}</td>
-                <td>
-                  @if (item.isLocked) {
-                    <p-button label="Locked" size="small" [outlined]="true" [disabled]="true" icon="pi pi-lock" />
-                  } @else {
-                    <a [routerLink]="['/app/learn', item.id]" class="no-underline">
-                      <p-button label="Open" size="small" [outlined]="true" />
-                    </a>
-                  }
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="5" class="ctp-muted">
-                  {{ programs().length ? 'No standalone courses.' : 'No assigned courses yet.' }}
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </section>
+          @for (item of assignments(); track item.id) {
+            <article class="tile course-tile" [class.locked]="item.isLocked">
+              <div class="tile-top">
+                <app-status-badge [status]="item.isLocked ? 'LOCKED' : item.status" />
+                @if (item.dueAt) {
+                  <span class="due">Due {{ item.dueAt | date: 'mediumDate' }}</span>
+                }
+              </div>
+              <div class="course-head">
+                @if (item.course.thumbnailMedia?.publicUrl) {
+                  <img [src]="mediaUrl(item.course.thumbnailMedia!.publicUrl)" alt="" />
+                } @else {
+                  <div class="thumb">{{ item.course.title[0] }}</div>
+                }
+                <div>
+                  <h2>{{ item.course.title }}</h2>
+                  <p class="muted">{{ item.course.code }} · Course</p>
+                </div>
+              </div>
+              <div class="bar"><span [style.width.%]="item.progressPercent"></span></div>
+              <p class="muted pct">{{ item.progressPercent }}% complete</p>
+              @if (item.isLocked) {
+                <p-button label="Locked" size="small" [outlined]="true" [disabled]="true" icon="pi pi-lock" />
+              } @else {
+                <a [routerLink]="['/app/learn', item.id]" class="no-underline">
+                  <p-button
+                    [label]="item.status === 'COMPLETED' ? 'Review' : item.status === 'IN_PROGRESS' ? 'Continue' : 'Start'"
+                    size="small"
+                  />
+                </a>
+              }
+            </article>
+          }
+        </div>
+      }
     }
 
     <p-dialog header="Level Complete" [(visible)]="levelCompleteVisible" [modal]="true" [style]="{ width: 'min(420px, 94vw)' }">
       <p>{{ completedLevelTitle }} completed.</p>
-      <p>You've completed all required courses in this level.</p>
+      <p>You've completed all required courses in this level. The next level is unlocked.</p>
       @if (nextLevelTitle) {
         <p>Next: {{ nextLevelTitle }}</p>
       }
@@ -146,79 +135,112 @@ import {
   `,
   styles: [
     `
-      .mb {
-        margin-bottom: var(--ctp-section-gap);
-      }
-      .panel {
-        padding: var(--ctp-card-pad);
-      }
-      .program {
-        padding: var(--ctp-card-pad);
+      .mb { margin-bottom: var(--ctp-section-gap); }
+      .muted { margin: 4px 0 0; color: var(--ctp-muted); font-size: 13px; }
+      .empty { margin-top: 8px; }
+      .tile-grid {
         display: grid;
-        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
       }
-      .program-head {
+      .tile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 18px;
+        border: 1px solid var(--ctp-border);
+        border-radius: var(--ctp-radius);
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        min-height: 220px;
+        box-sizing: border-box;
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+      }
+      a.tile:hover {
+        border-color: color-mix(in srgb, var(--ctp-primary) 45%, var(--ctp-border));
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      }
+      .tile.locked { opacity: 0.92; background: #fafafa; }
+      .tile-top {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
-        align-items: flex-start;
-      }
-      .program-link {
-        color: inherit;
-        text-decoration: none;
-      }
-      .program-link:hover {
-        color: var(--ctp-primary);
-      }
-      .program-actions {
-        display: flex;
         align-items: center;
         gap: 8px;
-        flex-shrink: 0;
       }
-      .muted {
-        margin: 2px 0 0;
+      .levels-pill, .due {
+        font-size: 12px;
+        font-weight: 600;
         color: var(--ctp-muted);
-        font-size: 13px;
+        letter-spacing: 0.02em;
       }
+      h2 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.3;
+      }
+      .current {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ctp-primary);
+      }
+      .level-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--ctp-border);
+        background: #fff;
+        color: var(--ctp-ink);
+      }
+      .chip.locked { color: var(--ctp-muted); background: #f3f4f6; }
+      .chip.done { color: #157347; border-color: #b7e4c7; background: #edf7f0; }
+      .chip.now { color: var(--ctp-primary); border-color: color-mix(in srgb, var(--ctp-primary) 35%, #fff); background: color-mix(in srgb, var(--ctp-primary) 8%, #fff); }
       .bar {
         height: 4px;
         border-radius: 999px;
         background: var(--ctp-border);
         overflow: hidden;
+        margin-top: auto;
       }
       .bar span {
         display: block;
         height: 100%;
         background: var(--ctp-primary);
       }
-      .strong {
+      .cta {
+        font-size: 13px;
         font-weight: 600;
-        font-size: var(--ctp-fs-body);
+        color: var(--ctp-primary);
       }
-      .tiny {
-        font-size: var(--ctp-fs-small);
-      }
-      .prog {
+      .course-head {
         display: flex;
-        align-items: center;
-        gap: var(--s2);
-        min-width: 140px;
+        gap: 12px;
+        align-items: flex-start;
       }
-      .prog span {
-        font-size: var(--ctp-fs-small);
-        color: var(--ctp-muted);
-        min-width: 32px;
+      .course-head img, .thumb {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--ctp-radius);
+        object-fit: cover;
+        flex-shrink: 0;
       }
-      :host ::ng-deep .h-prog {
-        height: 4px;
-        flex: 1;
+      .thumb {
+        display: grid;
+        place-items: center;
+        background: var(--ctp-primary-soft);
+        color: var(--ctp-primary);
+        font-weight: 700;
       }
+      .pct { margin: 0; }
       @media (max-width: 720px) {
-        .program-head {
-          flex-direction: column;
-          align-items: stretch;
-        }
+        .tile-grid { grid-template-columns: 1fr; }
       }
     `,
   ],
@@ -246,20 +268,26 @@ export class ProgressPageComponent implements OnInit {
 
   currentLevel = currentProgramLevel;
   levelLabel = levelLabel;
-  levelRoute = levelRoute;
   programRoute = programRoute;
+
+  isCurrent(program: ProgramProgressView, level: LearnerLevelSummary): boolean {
+    const current = currentProgramLevel(program);
+    return !!current && current.id === level.id && !level.completed && !level.locked;
+  }
+
+  mediaUrl(path: string): string {
+    return path.startsWith('http') ? path : `${environment.mediaBaseUrl}${path}`;
+  }
 
   overall(): number {
     const items = this.assignments();
     const programs = this.programs();
     if (!items.length && !programs.length) return 0;
-    if (programs.length && !items.length) {
-      const sum = programs.reduce((s, p) => s + (p.progressPercent || 0), 0);
-      return Math.round(sum / programs.length);
-    }
-    if (!items.length) return 0;
-    const sum = items.reduce((s, a) => s + (a.progressPercent || 0), 0);
-    return Math.round(sum / items.length);
+    const values = [
+      ...programs.map((p) => p.progressPercent || 0),
+      ...items.map((a) => a.progressPercent || 0),
+    ];
+    return Math.round(values.reduce((s, n) => s + n, 0) / values.length);
   }
 
   ngOnInit(): void {

@@ -12,11 +12,22 @@ export function requiredCoursesComplete(
   requiredCourseIds: string[],
   completedCourseIds: Iterable<string>,
 ): boolean {
+  // No gate courses configured → treat as incomplete so empty levels stay locked
+  // until courses exist. Callers should pass all level course ids as a fallback.
   if (requiredCourseIds.length === 0) return false;
   const completed = completedCourseIds instanceof Set
     ? completedCourseIds
     : new Set(completedCourseIds);
   return requiredCourseIds.every((id) => completed.has(id));
+}
+
+/** Courses that gate level completion / next-level unlock. */
+export function levelGateCourseIds(
+  courses: Array<{ courseId: string; isRequired?: boolean }>,
+): string[] {
+  const required = courses.filter((c) => c.isRequired !== false).map((c) => c.courseId);
+  if (required.length > 0) return required;
+  return courses.map((c) => c.courseId);
 }
 
 export function isFinalLevelComplete(input: {
