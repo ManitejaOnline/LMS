@@ -19,18 +19,11 @@ export const PRIMARY_NAV: NavItem[] = [
     exact: true,
   },
   {
-    id: 'my-learning',
-    label: 'My Learning',
-    icon: 'pi pi-bookmark',
-    route: '/app/my-learning',
-    roles: ['EMPLOYEE', 'MANAGER'],
-  },
-  {
     id: 'progress',
     label: 'Progress',
     icon: 'pi pi-chart-line',
     route: '/app/progress',
-    roles: ['EMPLOYEE'],
+    roles: ['EMPLOYEE', 'MANAGER'],
   },
   {
     id: 'courses',

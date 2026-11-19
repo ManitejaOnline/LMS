@@ -26,7 +26,7 @@ import {
     Message,
   ],
   template: `
-    <a routerLink="/app/my-learning" class="back">← Back to My Learning</a>
+    <a routerLink="/app/progress" class="back">← Back to Progress</a>
     @if (error()) {
       <p-message severity="error" [text]="error()!" styleClass="w-full mb-3" />
     }

@@ -11,6 +11,7 @@ import { LoadingStateComponent } from '../../shared/components/loading-state/loa
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
 import { CoursesApiService } from '../../core/http/courses-api.service';
+import { LearningApiService } from '../../core/http/learning-api.service';
 import type { CourseDto, CourseStatus } from '../../core/models/domain.models';
 import { environment } from '../../../environments/environment';
 
@@ -88,6 +89,7 @@ import { environment } from '../../../environments/environment';
               <th>Status</th>
               <th>Modules</th>
               <th>Mandatory</th>
+              <th>Access</th>
               <th></th>
             </tr>
           </ng-template>
@@ -110,28 +112,52 @@ import { environment } from '../../../environments/environment';
               <td><app-status-badge [status]="course.status" /></td>
               <td>{{ course._count?.modules ?? 0 }}</td>
               <td>{{ course.isMandatory ? 'Yes' : 'No' }}</td>
+              <td>
+                @if (course.status === 'PUBLISHED') {
+                  <app-status-badge [status]="course.isLocked ? 'LOCKED' : 'UNLOCKED'" />
+                } @else {
+                  —
+                }
+              </td>
               <td class="actions">
-                <a [routerLink]="['/app/courses', course.id]" class="no-underline">
+                <a [routerLink]="['/app/courses', course.id]" class="no-underline" title="Edit">
                   <p-button icon="pi pi-pencil" [text]="true" />
                 </a>
+                @if (course.status === 'PUBLISHED') {
+                  <a
+                    [routerLink]="['/app/courses', course.id]"
+                    [queryParams]="{ step: 'assign' }"
+                    class="no-underline"
+                    title="Assign people"
+                  >
+                    <p-button icon="pi pi-user-plus" [text]="true" />
+                  </a>
+                  <p-button
+                    [icon]="course.isLocked ? 'pi pi-lock-open' : 'pi pi-lock'"
+                    [text]="true"
+                    [title]="course.isLocked ? 'Unlock course' : 'Lock course'"
+                    (onClick)="toggleLock(course)"
+                  />
+                  <p-button
+                    icon="pi pi-inbox"
+                    [text]="true"
+                    title="Archive"
+                    (onClick)="setStatus(course, 'ARCHIVED')"
+                  />
+                }
                 @if (course.status !== 'PUBLISHED') {
                   <p-button
                     icon="pi pi-check"
                     [text]="true"
+                    title="Publish"
                     (onClick)="setStatus(course, 'PUBLISHED')"
-                  />
-                }
-                @if (course.status === 'PUBLISHED') {
-                  <p-button
-                    icon="pi pi-inbox"
-                    [text]="true"
-                    (onClick)="setStatus(course, 'ARCHIVED')"
                   />
                 }
                 <p-button
                   icon="pi pi-trash"
                   severity="danger"
                   [text]="true"
+                  title="Delete"
                   (onClick)="remove(course)"
                 />
               </td>
@@ -200,6 +226,7 @@ import { environment } from '../../../environments/environment';
 })
 export class CoursesListPageComponent implements OnInit {
   private readonly api = inject(CoursesApiService);
+  private readonly learningApi = inject(LearningApiService);
 
   readonly courses = signal<CourseDto[]>([]);
   readonly loading = signal(true);
@@ -267,6 +294,19 @@ export class CoursesListPageComponent implements OnInit {
       },
       error: (err) =>
         this.error.set(err?.error?.error?.message ?? 'Status update failed'),
+    });
+  }
+
+  toggleLock(course: CourseDto): void {
+    const next = !course.isLocked;
+    this.learningApi.setCourseLocked(course.id, next).subscribe({
+      next: () => {
+        this.courses.update((list) =>
+          list.map((c) => (c.id === course.id ? { ...c, isLocked: next } : c)),
+        );
+      },
+      error: (err) =>
+        this.error.set(err?.error?.error?.message ?? 'Failed to update lock'),
     });
   }
 

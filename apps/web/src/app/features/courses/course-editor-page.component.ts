@@ -23,6 +23,7 @@ import { DepartmentsApiService } from '../../core/http/departments-api.service';
 import { UsersApiService } from '../../core/http/users-api.service';
 import { ProtectedMediaService } from '../../core/content-protection/protected-media.service';
 import type {
+  CourseAssigneeDto,
   CourseDto,
   CourseModuleDto,
   CourseStatus,
@@ -31,7 +32,6 @@ import type {
   MediaAssetDto,
   UserDto,
 } from '../../core/models/domain.models';
-
 type AssignScope = 'ALL_EMPLOYEES' | 'DEPARTMENT' | 'ROLE' | 'EMPLOYEES';
 
 type AssignmentSummary = {
@@ -44,7 +44,7 @@ import { environment } from '../../../environments/environment';
 import { chapterConfig, detectPdfPageCount, readChapterBounds } from '../../shared/utils/pdf-meta.util';
 import { requireMediaAssetId } from '../../shared/utils/media-id.util';
 import { detectVideoDuration, formatBytes, formatDuration } from '../../shared/utils/video-meta.util';
-import { firstValueFrom } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, firstValueFrom } from 'rxjs';
 
 type AuthorStep = 'details' | 'content' | 'publish' | 'assign';
 type UploadTarget = 'thumbnail' | 'pdf' | 'video';
@@ -359,11 +359,26 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                 <div>
                   <h2 class="panel-title">Assign course</h2>
                   <p class="section-sub">
-                    Choose who should receive this published course. Assignment updates My Learning
-                    immediately.
+                    Assign this course to people one at a time or in bulk. Lock blocks learner access.
                   </p>
                 </div>
+                <p-button
+                  [label]="course()!.isLocked ? 'Unlock course' : 'Lock course'"
+                  [icon]="course()!.isLocked ? 'pi pi-lock-open' : 'pi pi-lock'"
+                  [outlined]="true"
+                  [severity]="course()!.isLocked ? 'success' : 'warn'"
+                  [loading]="lockingCourse()"
+                  (onClick)="toggleCourseLock()"
+                />
               </div>
+
+              @if (course()!.isLocked) {
+                <p-message
+                  severity="warn"
+                  text="This course is locked. Assigned learners cannot open it until you unlock."
+                  styleClass="w-full mb-2"
+                />
+              }
 
               @if (assignStats(); as stats) {
                 <div class="assign-summary" aria-live="polite">
@@ -389,14 +404,14 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
 
               <form class="assign-wizard" [formGroup]="assignForm" (ngSubmit)="assignCourse()">
                 <fieldset class="assign-scope">
-                  <legend>Assignment options</legend>
+                  <legend>Who to assign</legend>
                   <label class="scope-option">
                     <p-radioButton
                       name="scope"
-                      value="ALL_EMPLOYEES"
+                      value="EMPLOYEES"
                       formControlName="scope"
                     />
-                    <span>All Employees</span>
+                    <span>Specific people</span>
                   </label>
                   <label class="scope-option">
                     <p-radioButton
@@ -413,14 +428,14 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                   <label class="scope-option">
                     <p-radioButton
                       name="scope"
-                      value="EMPLOYEES"
+                      value="ALL_EMPLOYEES"
                       formControlName="scope"
                     />
-                    <span>Specific Employees</span>
+                    <span>All Employees</span>
                   </label>
                 </fieldset>
 
-                @if (assignForm.value.scope === 'DEPARTMENT') {
+                @if (assignForm.controls.scope.value === 'DEPARTMENT') {
                   <label class="field">
                     <span>Departments</span>
                     <p-multiSelect
@@ -431,12 +446,13 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                       placeholder="Select departments"
                       [filter]="true"
                       display="chip"
+                      appendTo="body"
                       styleClass="w-full"
                     />
                   </label>
                 }
 
-                @if (assignForm.value.scope === 'ROLE') {
+                @if (assignForm.controls.scope.value === 'ROLE') {
                   <label class="field">
                     <span>Roles</span>
                     <p-multiSelect
@@ -447,25 +463,32 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                       placeholder="Select roles"
                       [filter]="true"
                       display="chip"
+                      appendTo="body"
                       styleClass="w-full"
                     />
                   </label>
                 }
 
-                @if (assignForm.value.scope === 'EMPLOYEES') {
+                @if (assignForm.controls.scope.value === 'EMPLOYEES') {
                   <label class="field">
-                    <span>Employees</span>
+                    <span>Select people</span>
                     <p-multiSelect
                       formControlName="userIds"
                       [options]="employeeOptions()"
                       optionLabel="label"
                       optionValue="value"
-                      placeholder="Search employees"
+                      placeholder="Search and select people"
                       [filter]="true"
-                      filterPlaceHolder="Search by name or email"
+                      filterPlaceHolder="Type name or email"
                       display="chip"
+                      appendTo="body"
+                      [showClear]="true"
                       styleClass="w-full"
+                      (onFilter)="onEmployeeFilter($event)"
                     />
+                    @if (!employeeOptions().length) {
+                      <span class="employee-empty">No people found. Create employees under Employees, then search here.</span>
+                    }
                   </label>
                 }
 
@@ -502,8 +525,8 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                     <span>Send notification</span>
                   </label>
                   @if (
-                    assignForm.value.scope === 'ALL_EMPLOYEES' ||
-                    assignForm.value.scope === 'DEPARTMENT'
+                    assignForm.controls.scope.value === 'ALL_EMPLOYEES' ||
+                    assignForm.controls.scope.value === 'DEPARTMENT'
                   ) {
                     <label class="check-row">
                       <p-checkbox
@@ -519,13 +542,66 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
                 <div class="assign-actions">
                   <p-button
                     type="submit"
-                    label="Assign Course"
+                    label="Assign course"
                     icon="pi pi-send"
                     [loading]="assigning()"
                     [disabled]="!canSubmitAssign() || assigning()"
                   />
                 </div>
               </form>
+
+              <section class="assignee-roster">
+                <h3 class="roster-title">Assigned people</h3>
+                @if (assigneesLoading()) {
+                  <p class="muted">Loading assignees…</p>
+                } @else if (!assignees().length) {
+                  <p class="muted">No one assigned yet. Pick people above and assign.</p>
+                } @else {
+                  <table class="ctp-data-table">
+                    <thead>
+                      <tr>
+                        <th>Person</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Access</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of assignees(); track row.id) {
+                        <tr>
+                          <td>
+                            <div class="strong">{{ row.user.firstName }} {{ row.user.lastName }}</div>
+                            <div class="muted tiny">{{ row.user.email }}</div>
+                          </td>
+                          <td><app-status-badge [status]="row.status" /></td>
+                          <td>{{ row.progressPercent }}%</td>
+                          <td>
+                            <app-status-badge [status]="row.isLocked ? 'LOCKED' : 'UNLOCKED'" />
+                          </td>
+                          <td class="roster-actions">
+                            <p-button
+                              [label]="row.isLocked ? 'Unlock' : 'Lock'"
+                              [icon]="row.isLocked ? 'pi pi-lock-open' : 'pi pi-lock'"
+                              size="small"
+                              [text]="true"
+                              (onClick)="toggleAssignmentLock(row)"
+                            />
+                            <p-button
+                              label="Remove"
+                              icon="pi pi-user-minus"
+                              size="small"
+                              severity="danger"
+                              [text]="true"
+                              (onClick)="removeAssignee(row)"
+                            />
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </section>
             }
           </section>
         }
@@ -963,6 +1039,33 @@ type UploadTarget = 'thumbnail' | 'pdf' | 'video';
         display: grid;
         gap: 2px;
       }
+      .employee-empty {
+        display: block;
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--ctp-muted);
+      }
+      .assignee-roster {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--ctp-border);
+      }
+      .roster-title {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+      .roster-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+        white-space: nowrap;
+      }
+      .strong {
+        font-weight: 600;
+      }
+      .tiny {
+        font-size: 12px;
+      }
       .checklist {
         list-style: none;
         margin: 0;
@@ -1144,6 +1247,9 @@ export class CourseEditorPageComponent implements OnInit {
   readonly course = signal<CourseDto | null>(null);
   readonly modules = signal<CourseModuleDto[]>([]);
   readonly assignStats = signal<AssignmentSummary | null>(null);
+  readonly assignees = signal<CourseAssigneeDto[]>([]);
+  readonly assigneesLoading = signal(false);
+  readonly lockingCourse = signal(false);
   readonly thumbnailPreview = signal<string | null>(null);
   readonly uploadVisible = signal(false);
   readonly uploadKind = signal<'THUMBNAIL' | 'DOCUMENT' | 'VIDEO'>('THUMBNAIL');
@@ -1152,6 +1258,7 @@ export class CourseEditorPageComponent implements OnInit {
   readonly step = signal<AuthorStep>('details');
   readonly assigning = signal(false);
   readonly publishing = signal(false);
+  private readonly employeeSearch$ = new Subject<string>();
   lessonDialogVisible = false;
   editingLessonId: string | null = null;
   readonly lessonMedia = signal<MediaAssetDto | null>(null);
@@ -1193,7 +1300,7 @@ export class CourseEditorPageComponent implements OnInit {
   });
 
   readonly assignForm = this.fb.group({
-    scope: ['ALL_EMPLOYEES' as AssignScope, Validators.required],
+    scope: ['EMPLOYEES' as AssignScope, Validators.required],
     departmentIds: [[] as string[]],
     roles: [[] as string[]],
     userIds: [[] as string[]],
@@ -1211,8 +1318,17 @@ export class CourseEditorPageComponent implements OnInit {
     this.departmentsApi.list({ page: 1, pageSize: 100 }).subscribe({
       next: (res) => this.departments.set(res.items),
     });
-    this.usersApi.list({ page: 1, pageSize: 200, status: 'ACTIVE' }).subscribe({
-      next: (res) => this.employees.set(res.items),
+    this.loadEmployees();
+    this.employeeSearch$
+      .pipe(debounceTime(250), distinctUntilChanged())
+      .subscribe((search) => this.loadEmployees(search));
+
+    this.route.queryParamMap.subscribe((q) => {
+      const step = q.get('step');
+      if (step === 'assign' || step === 'content' || step === 'publish' || step === 'details') {
+        // Applied after course loads via applyCourse / goStep
+        this.pendingStep = step;
+      }
     });
 
     this.route.paramMap.subscribe((params) => {
@@ -1221,6 +1337,7 @@ export class CourseEditorPageComponent implements OnInit {
         this.course.set(null);
         this.modules.set([]);
         this.assignStats.set(null);
+        this.assignees.set([]);
         this.step.set('details');
         this.loading.set(false);
         return;
@@ -1230,6 +1347,10 @@ export class CourseEditorPageComponent implements OnInit {
         next: (course) => {
           this.applyCourse(course);
           this.loading.set(false);
+          if (this.pendingStep) {
+            this.goStep(this.pendingStep);
+            this.pendingStep = null;
+          }
         },
         error: (err) => {
           this.loading.set(false);
@@ -1237,6 +1358,21 @@ export class CourseEditorPageComponent implements OnInit {
         },
       });
     });
+  }
+
+  private pendingStep: AuthorStep | null = null;
+
+  loadEmployees(search = ''): void {
+    this.usersApi
+      .list({ page: 1, pageSize: 100, status: 'ACTIVE', search: search || undefined })
+      .subscribe({
+        next: (res) => this.employees.set(res.items),
+        error: () => this.employees.set([]),
+      });
+  }
+
+  onEmployeeFilter(event: { filter?: string }): void {
+    this.employeeSearch$.next((event.filter ?? '').trim());
   }
 
   canOpenStep(id: AuthorStep): boolean {
@@ -1268,6 +1404,7 @@ export class CourseEditorPageComponent implements OnInit {
     this.step.set(id);
     if (id === 'assign' && this.course()?.status === 'PUBLISHED') {
       this.loadAssignStats();
+      this.loadAssignees();
     }
   }
 
@@ -1300,6 +1437,78 @@ export class CourseEditorPageComponent implements OnInit {
     this.learningApi.assignmentStats(course.id).subscribe({
       next: (stats) => this.assignStats.set(stats),
       error: () => this.assignStats.set(null),
+    });
+  }
+
+  loadAssignees(): void {
+    const course = this.course();
+    if (!course || course.status !== 'PUBLISHED') {
+      this.assignees.set([]);
+      return;
+    }
+    this.assigneesLoading.set(true);
+    this.learningApi.listAssignees(course.id).subscribe({
+      next: (rows) => {
+        this.assignees.set(rows);
+        this.assigneesLoading.set(false);
+      },
+      error: () => {
+        this.assignees.set([]);
+        this.assigneesLoading.set(false);
+      },
+    });
+  }
+
+  toggleCourseLock(): void {
+    const course = this.course();
+    if (!course) return;
+    const next = !course.isLocked;
+    this.lockingCourse.set(true);
+    this.learningApi.setCourseLocked(course.id, next).subscribe({
+      next: () => {
+        this.lockingCourse.set(false);
+        this.course.set({ ...course, isLocked: next });
+        this.info.set(next ? 'Course locked for learners' : 'Course unlocked');
+      },
+      error: (err) => {
+        this.lockingCourse.set(false);
+        this.error.set(err?.error?.error?.message ?? 'Failed to update lock');
+      },
+    });
+  }
+
+  toggleAssignmentLock(row: CourseAssigneeDto): void {
+    const course = this.course();
+    if (!course) return;
+    this.learningApi.setAssignmentLocked(course.id, row.id, !row.isLocked).subscribe({
+      next: (res) => {
+        this.assignees.update((list) =>
+          list.map((item) =>
+            item.id === row.id ? { ...item, isLocked: res.isLocked } : item,
+          ),
+        );
+      },
+      error: (err) => {
+        this.error.set(err?.error?.error?.message ?? 'Failed to update assignment lock');
+      },
+    });
+  }
+
+  removeAssignee(row: CourseAssigneeDto): void {
+    const course = this.course();
+    if (!course) return;
+    if (!confirm(`Remove ${row.user.firstName} ${row.user.lastName} from this course?`)) {
+      return;
+    }
+    this.learningApi.unassign(course.id, row.id).subscribe({
+      next: () => {
+        this.assignees.update((list) => list.filter((item) => item.id !== row.id));
+        this.loadAssignStats();
+        this.info.set('Person unassigned');
+      },
+      error: (err) => {
+        this.error.set(err?.error?.error?.message ?? 'Failed to unassign');
+      },
     });
   }
 
@@ -1343,11 +1552,15 @@ export class CourseEditorPageComponent implements OnInit {
         });
         this.assignForm.patchValue({
           isMandatory: !!raw.isMandatory,
+          userIds: [],
+          departmentIds: [],
+          roles: [],
         });
         this.courseForm.patchValue({ isMandatory: !!raw.isMandatory });
         this.info.set(
-          `Assigned to ${res.assigned} employees — Completed: ${res.completed}, In Progress: ${res.inProgress}, Not Started: ${res.notStarted}`,
+          `Assigned to ${res.assigned} people — Completed: ${res.completed}, In Progress: ${res.inProgress}, Not Started: ${res.notStarted}`,
         );
+        this.loadAssignees();
         this.reloadCourse();
       },
       error: (err) => {
@@ -1384,8 +1597,12 @@ export class CourseEditorPageComponent implements OnInit {
     );
     if (course.status === 'PUBLISHED') {
       this.loadAssignStats();
+      if (this.step() === 'assign') {
+        this.loadAssignees();
+      }
     } else {
       this.assignStats.set(null);
+      this.assignees.set([]);
     }
   }
 

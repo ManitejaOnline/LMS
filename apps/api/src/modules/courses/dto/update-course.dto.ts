@@ -41,6 +41,13 @@ export class UpdateCourseDto {
   @IsBoolean()
   isMandatory?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'When true, learners cannot open this course until unlocked',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isLocked?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()

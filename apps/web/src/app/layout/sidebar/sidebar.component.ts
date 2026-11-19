@@ -154,14 +154,14 @@ import { SidebarStateService } from './sidebar-state.service';
         width: auto;
         height: auto;
         max-width: 168px;
-        max-height: 44px;
+        max-height: 40px;
         object-fit: contain;
         object-position: left center;
         flex: 0 0 auto;
-        background: #000;
+        background: transparent;
         border: 0;
-        border-radius: 6px;
-        padding: 4px 8px;
+        border-radius: 0;
+        padding: 0;
         box-shadow: none;
       }
       .collapsed .brand-logo {

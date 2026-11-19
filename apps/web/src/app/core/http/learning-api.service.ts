@@ -4,6 +4,7 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { ApiSuccessResponse } from '../models/api-response.model';
 import type {
+  CourseAssigneeDto,
   CourseAssignmentDto,
   LearningDashboardDto,
   LearningEventInput,
@@ -207,6 +208,40 @@ export class LearningApiService {
           notStarted: number;
         }>
       >(`${environment.apiBaseUrl}/courses/${courseId}/assignments/stats`)
+      .pipe(map((r) => r.data));
+  }
+
+  listAssignees(courseId: string) {
+    return this.http
+      .get<ApiSuccessResponse<CourseAssigneeDto[]>>(
+        `${environment.apiBaseUrl}/courses/${courseId}/assignments`,
+      )
+      .pipe(map((r) => r.data));
+  }
+
+  setCourseLocked(courseId: string, isLocked: boolean) {
+    return this.http
+      .patch<ApiSuccessResponse<{ id: string; isLocked: boolean }>>(
+        `${environment.apiBaseUrl}/courses/${courseId}/lock`,
+        { isLocked },
+      )
+      .pipe(map((r) => r.data));
+  }
+
+  setAssignmentLocked(courseId: string, assignmentId: string, isLocked: boolean) {
+    return this.http
+      .patch<ApiSuccessResponse<{ id: string; isLocked: boolean }>>(
+        `${environment.apiBaseUrl}/courses/${courseId}/assignments/${assignmentId}/lock`,
+        { isLocked },
+      )
+      .pipe(map((r) => r.data));
+  }
+
+  unassign(courseId: string, assignmentId: string) {
+    return this.http
+      .delete<ApiSuccessResponse<{ id: string; deleted: boolean }>>(
+        `${environment.apiBaseUrl}/courses/${courseId}/assignments/${assignmentId}`,
+      )
       .pipe(map((r) => r.data));
   }
 }

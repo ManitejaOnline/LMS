@@ -209,6 +209,7 @@ model Course {
   description      String?
   status           CourseStatus @default(DRAFT)
   isMandatory      Boolean      @default(true) @map("is_mandatory")
+  isLocked         Boolean      @default(false) @map("is_locked")
   estimatedMinutes Int?         @map("estimated_minutes")
   thumbnailMediaId String?      @map("thumbnail_media_id")
   createdById      String?      @map("created_by_id")
@@ -353,6 +354,7 @@ model CourseAssignment {
   userId          String           @map("user_id")
   ruleId          String?          @map("rule_id")
   status          AssignmentStatus @default(NOT_STARTED)
+  isLocked             Boolean          @default(false) @map("is_locked")
   dueAt           DateTime?        @map("due_at")
   startedAt       DateTime?        @map("started_at")
   completedAt     DateTime?        @map("completed_at")

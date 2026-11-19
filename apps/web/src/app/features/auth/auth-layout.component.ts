@@ -23,7 +23,7 @@ import { Component } from '@angular/core';
         min-height: 100dvh;
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        background: #000;
+        background: #f8fafc;
       }
       .auth-brand {
         display: flex;
@@ -32,17 +32,22 @@ import { Component } from '@angular/core';
         justify-content: center;
         gap: 16px;
         padding: 48px 32px;
-        background: #000;
+        background:
+          radial-gradient(900px 420px at 20% 30%, color-mix(in srgb, #2a4f7d 12%, transparent), transparent),
+          radial-gradient(700px 360px at 80% 70%, color-mix(in srgb, #f4811f 10%, transparent), transparent),
+          #ffffff;
+        border-right: 1px solid #e5e7eb;
       }
       .auth-logo {
         display: block;
         width: min(360px, 86%);
         height: auto;
         object-fit: contain;
+        background: transparent;
       }
       .tagline {
         margin: 0;
-        color: #9ca3af;
+        color: #64748b;
         font-size: 13px;
         letter-spacing: 0.12em;
         text-transform: uppercase;

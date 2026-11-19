@@ -953,11 +953,11 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
     if (programId && levelId) {
       return ['/app/learning/programs', programId, 'levels', levelId];
     }
-    return ['/app/my-learning'];
+    return ['/app/progress'];
   }
 
   backLabel(): string {
-    return this.route.snapshot.queryParamMap.get('levelId') ? 'Back to Level' : 'Back to My Learning';
+    return this.route.snapshot.queryParamMap.get('levelId') ? 'Back to Level' : 'Back to Progress';
   }
 
   ngOnInit(): void {

@@ -424,8 +424,7 @@ export class ShellLayoutComponent implements OnInit {
 
   private updateTitle(url: string): void {
     if (url.includes('/courses')) this.pageTitle.set('Courses');
-    else if (url.includes('/my-learning') || url.includes('/learn/')) this.pageTitle.set('My Learning');
-    else if (url.includes('/progress')) this.pageTitle.set('Progress');
+    else if (url.includes('/progress') || url.includes('/learn/')) this.pageTitle.set('Progress');
     else if (url.includes('/users')) this.pageTitle.set('Employees');
     else if (url.includes('/departments')) this.pageTitle.set('Departments');
     else if (url.includes('/reports')) this.pageTitle.set('Reports');

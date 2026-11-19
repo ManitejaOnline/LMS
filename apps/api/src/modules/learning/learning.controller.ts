@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
 } from '@nestjs/common';
@@ -14,6 +16,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { extractClientMeta } from '../../common/utils/request-meta.util';
 import type { AuthenticatedUser } from '../../infrastructure/auth/types/authenticated-user';
 import { AssignCourseDto } from './dto/assign-course.dto';
+import { SetLockDto } from './dto/set-lock.dto';
 import { IngestLearningEventsDto } from './dto/ingest-learning-events.dto';
 import { CompletePageDto, SavePageProgressDto } from './dto/page-progress.dto';
 import { LearnerLessonProgressDto } from './dto/learner-lesson-progress.dto';
@@ -218,5 +221,65 @@ export class LearningController {
   @ApiOperation({ summary: 'Assignment completion summary for a course' })
   assignmentStats(@Param('courseId') courseId: string) {
     return this.learningService.assignmentStats(courseId);
+  }
+
+  @Get('courses/:courseId/assignments')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN, AppRole.MANAGER)
+  @ApiOperation({ summary: 'List people assigned to a course' })
+  listAssignees(@Param('courseId') courseId: string) {
+    return this.learningService.listCourseAssignees(courseId);
+  }
+
+  @Patch('courses/:courseId/lock')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @ApiOperation({ summary: 'Lock or unlock a course for all learners' })
+  setCourseLock(
+    @Param('courseId') courseId: string,
+    @Body() dto: SetLockDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.learningService.setCourseLocked(
+      courseId,
+      dto.isLocked,
+      actor,
+      extractClientMeta(request),
+    );
+  }
+
+  @Patch('courses/:courseId/assignments/:assignmentId/lock')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @ApiOperation({ summary: 'Lock or unlock one learner assignment' })
+  setAssignmentLock(
+    @Param('courseId') courseId: string,
+    @Param('assignmentId') assignmentId: string,
+    @Body() dto: SetLockDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.learningService.setAssignmentLocked(
+      courseId,
+      assignmentId,
+      dto.isLocked,
+      actor,
+      extractClientMeta(request),
+    );
+  }
+
+  @Delete('courses/:courseId/assignments/:assignmentId')
+  @Roles(AppRole.SUPER_ADMIN, AppRole.ADMIN)
+  @ApiOperation({ summary: 'Unassign a learner from a course' })
+  unassign(
+    @Param('courseId') courseId: string,
+    @Param('assignmentId') assignmentId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.learningService.unassignLearner(
+      courseId,
+      assignmentId,
+      actor,
+      extractClientMeta(request),
+    );
   }
 }

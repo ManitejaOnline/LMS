@@ -195,6 +195,7 @@ export class CoursesService {
             ? undefined
             : dto.description?.trim() || null,
         isMandatory: dto.isMandatory,
+        isLocked: dto.isLocked,
         estimatedMinutes: dto.estimatedMinutes,
         thumbnailMediaId: dto.thumbnailMediaId,
       },

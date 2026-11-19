@@ -241,7 +241,7 @@ export class LearningService {
         await this.notifications.notify({
           userId,
           title: `Course assigned: ${course.title}`,
-          body: `You have been assigned “${course.title}”. Open My Learning to begin.`,
+          body: `You have been assigned “${course.title}”. Open Progress to begin.`,
           type: 'COURSE_ASSIGNED',
           metadata: { courseId: course.id },
         });
@@ -268,6 +268,126 @@ export class LearningService {
       created,
       ...summary,
     };
+  }
+
+  async listCourseAssignees(courseId: string) {
+    await this.requirePublishedCourse(courseId);
+    const items = await this.prisma.courseAssignment.findMany({
+      where: { courseId, deletedAt: null },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ assignedAt: 'desc' }],
+    });
+    return items.map((row) => ({
+      id: row.id,
+      courseId: row.courseId,
+      userId: row.userId,
+      status: row.status,
+      isLocked: row.isLocked,
+      progressPercent: row.progressPercent,
+      dueAt: row.dueAt,
+      assignedAt: row.assignedAt,
+      user: {
+        id: row.user.id,
+        firstName: row.user.firstName,
+        lastName: row.user.lastName,
+        email: row.user.email,
+        role: row.user.role,
+        departmentName: row.user.department?.name ?? null,
+      },
+    }));
+  }
+
+  async setCourseLocked(
+    courseId: string,
+    isLocked: boolean,
+    actor: AuthenticatedUser,
+    meta?: ClientMeta,
+  ) {
+    const course = await this.requirePublishedCourse(courseId);
+    const updated = await this.prisma.course.update({
+      where: { id: course.id },
+      data: { isLocked },
+    });
+    await this.audit.write({
+      actorId: actor.userId,
+      action: AuditActions.COURSE_UPDATE,
+      entityType: 'Course',
+      entityId: courseId,
+      metadata: { isLocked },
+      ...meta,
+    });
+    return updated;
+  }
+
+  async setAssignmentLocked(
+    courseId: string,
+    assignmentId: string,
+    isLocked: boolean,
+    actor: AuthenticatedUser,
+    meta?: ClientMeta,
+  ) {
+    await this.requirePublishedCourse(courseId);
+    const assignment = await this.prisma.courseAssignment.findFirst({
+      where: { id: assignmentId, courseId, deletedAt: null },
+    });
+    if (!assignment) {
+      throw new NotFoundException('Assignment not found');
+    }
+    const updated = await this.prisma.courseAssignment.update({
+      where: { id: assignment.id },
+      data: { isLocked },
+    });
+    await this.audit.write({
+      actorId: actor.userId,
+      action: AuditActions.ASSIGNMENT_CREATE,
+      entityType: 'CourseAssignment',
+      entityId: assignment.id,
+      metadata: { isLocked },
+      ...meta,
+    });
+    return {
+      id: updated.id,
+      isLocked: updated.isLocked,
+    };
+  }
+
+  async unassignLearner(
+    courseId: string,
+    assignmentId: string,
+    actor: AuthenticatedUser,
+    meta?: ClientMeta,
+  ) {
+    await this.requirePublishedCourse(courseId);
+    const assignment = await this.prisma.courseAssignment.findFirst({
+      where: { id: assignmentId, courseId, deletedAt: null },
+    });
+    if (!assignment) {
+      throw new NotFoundException('Assignment not found');
+    }
+    await this.prisma.courseAssignment.update({
+      where: { id: assignment.id },
+      data: { deletedAt: new Date() },
+    });
+    await this.audit.write({
+      actorId: actor.userId,
+      action: AuditActions.ASSIGNMENT_CREATE,
+      entityType: 'CourseAssignment',
+      entityId: assignment.id,
+      metadata: { unassigned: true, userId: assignment.userId },
+      ...meta,
+    });
+    return { id: assignment.id, deleted: true };
   }
 
   async assignmentStats(courseId: string) {
@@ -313,6 +433,7 @@ export class LearningService {
 
     return items.map((item) => ({
       ...item,
+      isLocked: item.isLocked || item.course.isLocked,
       isOverdue:
         !!item.dueAt &&
         item.dueAt < new Date() &&
@@ -1265,6 +1386,7 @@ export class LearningService {
   ) {
     const assignment = await this.prisma.courseAssignment.findFirst({
       where: { id: assignmentId, deletedAt: null },
+      include: { course: { select: { isLocked: true, title: true } } },
     });
     if (!assignment) {
       throw new NotFoundException('Assignment not found');
@@ -1279,6 +1401,11 @@ export class LearningService {
       throw new ForbiddenException('You do not own this assignment');
     }
     if (isOwner) {
+      if (assignment.isLocked || assignment.course.isLocked) {
+        throw new ForbiddenException(
+          'This course is locked. Contact your administrator.',
+        );
+      }
       await this.programProgress.assertCourseAccessible(assignment);
     }
     return assignment;
@@ -1287,9 +1414,15 @@ export class LearningService {
   private async requireEnrollment(courseId: string, user: AuthenticatedUser) {
     const assignment = await this.prisma.courseAssignment.findFirst({
       where: { courseId, userId: user.userId, deletedAt: null },
+      include: { course: { select: { isLocked: true } } },
     });
     if (!assignment) {
       throw new ForbiddenException('You are not enrolled in this course');
+    }
+    if (assignment.isLocked || assignment.course.isLocked) {
+      throw new ForbiddenException(
+        'This course is locked. Contact your administrator.',
+      );
     }
     await this.programProgress.assertCourseAccessible(assignment);
     return assignment;

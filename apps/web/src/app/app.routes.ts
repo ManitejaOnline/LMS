@@ -40,10 +40,8 @@ export const routes: Routes = [
       },
       {
         path: 'my-learning',
-        loadComponent: () =>
-          import('./features/learning/my-learning-page.component').then(
-            (m) => m.MyLearningPageComponent,
-          ),
+        redirectTo: 'progress',
+        pathMatch: 'full',
       },
       {
         path: 'progress',

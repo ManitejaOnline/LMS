@@ -20,7 +20,7 @@ import { programRoute } from '../../shared/utils/program-progress.util';
     @if (detail(); as view) {
       <a [routerLink]="programRoute(view.programId)" class="back">← Back to {{ view.programName }}</a>
     } @else {
-      <a routerLink="/app/my-learning" class="back">← Back to My Learning</a>
+      <a routerLink="/app/progress" class="back">← Back to Progress</a>
     }
 
     @if (error()) {

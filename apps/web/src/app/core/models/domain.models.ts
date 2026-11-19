@@ -141,6 +141,7 @@ export interface CourseDto {
   description: string | null;
   status: CourseStatus;
   isMandatory: boolean;
+  isLocked?: boolean;
   estimatedMinutes: number | null;
   thumbnailMediaId: string | null;
   publishedAt: string | null;
@@ -167,6 +168,7 @@ export interface CourseAssignmentDto {
   courseId: string;
   userId: string;
   status: AssignmentStatus;
+  isLocked?: boolean;
   dueAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -177,6 +179,25 @@ export interface CourseAssignmentDto {
   isOverdue?: boolean;
   programEvent?: ProgramSyncEvent | null;
   course: CourseDto;
+}
+
+export interface CourseAssigneeDto {
+  id: string;
+  courseId: string;
+  userId: string;
+  status: AssignmentStatus;
+  isLocked: boolean;
+  progressPercent: number;
+  dueAt: string | null;
+  assignedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    departmentName: string | null;
+  };
 }
 
 export interface ProgramSyncEvent {

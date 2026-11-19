@@ -14,17 +14,23 @@ export class StatusBadgeComponent {
 
   badgeClass(): string {
     const value = this.status().toUpperCase();
-    if (value === 'PUBLISHED' || value === 'COMPLETED' || value === 'ACTIVE') {
+    if (
+      value === 'PUBLISHED' ||
+      value === 'COMPLETED' ||
+      value === 'ACTIVE' ||
+      value === 'UNLOCKED'
+    ) {
       return 'ctp-badge--success';
     }
     if (value === 'DRAFT' || value === 'NOT_STARTED' || value === 'INACTIVE') {
       return 'ctp-badge--neutral';
     }
-    if (value === 'IN_PROGRESS' || value === 'LOCKED') {
+    if (value === 'IN_PROGRESS') {
       return 'ctp-badge--info';
     }
-    if (value === 'ARCHIVED' || value === 'OVERDUE') {
-      return value === 'OVERDUE' ? 'ctp-badge--danger' : 'ctp-badge--warning';
+    if (value === 'LOCKED' || value === 'ARCHIVED' || value === 'OVERDUE') {
+      if (value === 'OVERDUE') return 'ctp-badge--danger';
+      return 'ctp-badge--warning';
     }
     return 'ctp-badge--neutral';
   }

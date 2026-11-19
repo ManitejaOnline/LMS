@@ -132,7 +132,7 @@ import type { CourseDto } from '../../core/models/domain.models';
               <a routerLink="/app/courses" class="ql">Courses</a>
               <a routerLink="/app/users" class="ql">Employees</a>
               <a routerLink="/app/reports" class="ql">Reports</a>
-              <a routerLink="/app/my-learning" class="ql">Assignments</a>
+              <a routerLink="/app/progress" class="ql">Progress</a>
             </div>
           </section>
         </div>
@@ -197,8 +197,8 @@ import type { CourseDto } from '../../core/models/domain.models';
           <h2 class="ctp-section-title">Continue learning</h2>
           <p class="ctp-muted">Open your assigned courses and resume where you left off.</p>
         </div>
-        <a routerLink="/app/my-learning" class="no-underline">
-          <p-button label="Go to assignments" icon="pi pi-arrow-right" iconPos="right" />
+        <a routerLink="/app/progress" class="no-underline">
+          <p-button label="Go to progress" icon="pi pi-arrow-right" iconPos="right" />
         </a>
       </section>
     }

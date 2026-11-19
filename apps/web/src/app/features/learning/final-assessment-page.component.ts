@@ -35,7 +35,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <h2>{{ res.passed ? 'Passed' : 'Not passed' }}</h2>
         <p>{{ res.score }}% · Passing score {{ res.passingScore }}%</p>
         @if (res.passed) {
-          <a routerLink="/app/my-learning" class="no-underline"><p-button label="Return to My Learning" /></a>
+          <a routerLink="/app/progress" class="no-underline"><p-button label="Return to Progress" /></a>
         } @else if (res.remainingAttempts > 0) {
           <p-button label="Try again" (onClick)="start()" />
         }

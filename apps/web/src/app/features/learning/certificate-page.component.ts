@@ -14,7 +14,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
   imports: [PageHeaderComponent, LoadingStateComponent, RouterLink, Button, Message, DatePipe],
   template: `
     <app-page-header title="Certificate" subtitle="Issued only after program completion." />
-    <a routerLink="/app/my-learning" class="back">Back to My Learning</a>
+    <a routerLink="/app/progress" class="back">Back to Progress</a>
     @if (error()) {
       <p-message severity="error" [text]="error()!" styleClass="w-full mb-3" />
     }
