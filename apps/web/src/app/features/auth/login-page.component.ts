@@ -119,8 +119,14 @@ import { AuthLayoutComponent } from './auth-layout.component';
         border-color: #2a4f7d;
       }
       :host ::ng-deep .auth-submit.p-button:not(:disabled):hover {
-        background: #433884;
-        border-color: #433884;
+        background: #224066;
+        border-color: #224066;
+      }
+      :host ::ng-deep .field .p-inputtext,
+      :host ::ng-deep .field .p-password-input {
+        background: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #d1d5db !important;
       }
     `,
   ],

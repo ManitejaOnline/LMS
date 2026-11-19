@@ -10,7 +10,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://lms-zebl.vercel.app"
+          "value": "https://lms.vebhc.com"
         },
         {
           "key": "Access-Control-Allow-Credentials",

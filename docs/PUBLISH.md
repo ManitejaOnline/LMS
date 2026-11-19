@@ -24,7 +24,7 @@ Today the app is published on **Vercel** (not AWS yet).
 
 | App | URL | Vercel project setup |
 |---|---|---|
-| Web | https://lms-zebl.vercel.app | Repo root — uses root `vercel.json` |
+| Web | https://lms.vebhc.com (also https://lms-zebl.vercel.app) | Repo root — uses root `vercel.json` |
 | API | https://zebl-lms.vercel.app | Root Directory = `apps/api` |
 
 Web → API wiring is in:
@@ -70,7 +70,7 @@ Critical values:
 | `DATABASE_URL` | Postgres (prefer pooled URL + `sslmode=require`) |
 | `JWT_ACCESS_SECRET` | Access token secret (32+ random chars) |
 | `JWT_REFRESH_SECRET` | Refresh token secret (32+ random chars) |
-| `APP_CORS_ORIGINS` | e.g. `https://lms-zebl.vercel.app` |
+| `APP_CORS_ORIGINS` | e.g. `https://lms.vebhc.com,https://lms-zebl.vercel.app` |
 | `BLOB_READ_WRITE_TOKEN` and/or `BLOB_STORE_ID` | Vercel Blob for durable media |
 | `UPLOAD_MAX_VIDEO_BYTES` | Default `500000000` (500 MB) |
 | `NODE_ENV` | `production` |
