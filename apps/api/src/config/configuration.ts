@@ -1,16 +1,27 @@
 import type { ConfigType } from '@nestjs/config';
 import { registerAs } from '@nestjs/config';
 
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:4200',
+  'https://lms.vebhc.com',
+  'https://lms-zebl.vercel.app',
+];
+
+function resolveCorsOrigins(): string[] {
+  const fromEnv = (process.env.APP_CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return [...new Set([...DEFAULT_CORS_ORIGINS, ...fromEnv])];
+}
+
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   name: process.env.APP_NAME ?? 'zebl-lms-api',
   // Railway/Render set PORT; local/dev uses APP_PORT
   port: Number(process.env.PORT ?? process.env.APP_PORT ?? 3000),
   globalPrefix: process.env.APP_GLOBAL_PREFIX ?? 'api/v1',
-  corsOrigins: (process.env.APP_CORS_ORIGINS ?? 'http://localhost:4200')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  corsOrigins: resolveCorsOrigins(),
 }));
 
 export const databaseConfig = registerAs('database', () => ({
