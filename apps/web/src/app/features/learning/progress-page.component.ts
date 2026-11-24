@@ -12,10 +12,9 @@ import { StatCardComponent } from '../../shared/components/stat-card/stat-card.c
 import { LearningApiService } from '../../core/http/learning-api.service';
 import { ProgramsApiService } from '../../core/http/programs-api.service';
 import type { CourseAssignmentDto, LearningDashboardDto } from '../../core/models/domain.models';
-import type { LearnerLevelSummary, ProgramProgressView } from '../../core/models/program.models';
+import type { ProgramProgressView } from '../../core/models/program.models';
 import {
-  currentProgramLevel,
-  levelLabel,
+  levelRoute,
   programRoute,
   standaloneAssignments,
 } from '../../shared/utils/program-progress.util';
@@ -60,7 +59,7 @@ import { environment } from '../../../environments/environment';
       } @else {
         <div class="tile-grid">
           @for (program of programs(); track program.enrollmentId) {
-            <a [routerLink]="programRoute(program.programId)" class="tile program-tile">
+            <article class="tile program-tile">
               <div class="tile-top">
                 <app-status-badge [status]="program.status" />
                 <span class="levels-pill">{{ program.levels.length }} levels</span>
@@ -69,22 +68,29 @@ import { environment } from '../../../environments/environment';
               <p class="muted">
                 {{ program.completedCourses }} / {{ program.totalCourses }} courses · {{ program.progressPercent }}%
               </p>
-              @if (currentLevel(program); as current) {
-                <p class="current">Current: {{ levelLabel(current) }}</p>
-              }
               <div class="level-chips" aria-label="Levels">
                 @for (level of program.levels; track level.id) {
-                  <span class="chip" [class.locked]="level.locked" [class.done]="level.completed" [class.now]="isCurrent(program, level)">
+                  <a
+                    [routerLink]="levelRoute(program.programId, level.id)"
+                    class="chip"
+                    [class.locked]="level.locked"
+                    [class.done]="level.completed"
+                    [attr.aria-disabled]="level.locked ? true : null"
+                    (click)="level.locked && $event.preventDefault()"
+                  >
+                    <i class="pi pi-play" aria-hidden="true"></i>
                     {{ level.isFinal ? 'Final' : 'L' + level.number }}
-                    @if (level.locked) { · Locked }
-                    @else if (level.completed) { · Done }
-                    @else if (isCurrent(program, level)) { · Current }
-                  </span>
+                  </a>
                 }
               </div>
               <div class="bar"><span [style.width.%]="program.progressPercent"></span></div>
-              <span class="cta">View levels →</span>
-            </a>
+              <a
+                [routerLink]="programRoute(program.programId)"
+                class="no-underline start-wrap"
+              >
+                <p-button label="Start" icon="pi pi-play" size="small" />
+              </a>
+            </article>
           }
 
           @for (item of assignments(); track item.id) {
@@ -191,17 +197,29 @@ import { environment } from '../../../environments/environment';
         gap: 6px;
       }
       .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         font-size: 12px;
         font-weight: 600;
-        padding: 4px 8px;
+        padding: 6px 10px;
         border-radius: 999px;
         border: 1px solid var(--ctp-border);
         background: #fff;
         color: var(--ctp-ink);
+        text-decoration: none;
+        min-height: 32px;
       }
-      .chip.locked { color: var(--ctp-muted); background: #f3f4f6; }
+      .chip i { font-size: 10px; }
+      .chip:hover:not(.locked) {
+        border-color: color-mix(in srgb, var(--ctp-primary) 40%, var(--ctp-border));
+        color: var(--ctp-primary);
+      }
+      .chip.locked { color: var(--ctp-muted); background: #f3f4f6; pointer-events: none; }
       .chip.done { color: #157347; border-color: #b7e4c7; background: #edf7f0; }
-      .chip.now { color: var(--ctp-primary); border-color: color-mix(in srgb, var(--ctp-primary) 35%, #fff); background: color-mix(in srgb, var(--ctp-primary) 8%, #fff); }
+      .start-wrap { margin-top: 4px; align-self: flex-start; }
+      .current { display: none; }
+      .cta { display: none; }
       .bar {
         height: 4px;
         border-radius: 999px;
@@ -266,14 +284,8 @@ export class ProgressPageComponent implements OnInit {
   completedLevelTitle = '';
   nextLevelTitle = '';
 
-  currentLevel = currentProgramLevel;
-  levelLabel = levelLabel;
+  levelRoute = levelRoute;
   programRoute = programRoute;
-
-  isCurrent(program: ProgramProgressView, level: LearnerLevelSummary): boolean {
-    const current = currentProgramLevel(program);
-    return !!current && current.id === level.id && !level.completed && !level.locked;
-  }
 
   mediaUrl(path: string): string {
     return path.startsWith('http') ? path : `${environment.mediaBaseUrl}${path}`;

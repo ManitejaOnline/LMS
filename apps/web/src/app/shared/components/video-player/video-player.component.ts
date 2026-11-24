@@ -55,7 +55,7 @@ import { clampVideoStartAt, videoWatchPercentage } from '../../utils/video-resum
         @if (loadError()) {
           <p class="video-error">This video could not be loaded. Refresh the page and try again.</p>
         }
-        <div class="video-watermark" aria-hidden="true">VEB Healthcare Private</div>
+        <div class="video-watermark" aria-hidden="true">VEB Healthcare</div>
       </div>
     </div>
   `,
@@ -120,7 +120,7 @@ import { clampVideoStartAt, videoWatchPercentage } from '../../utils/video-resum
         position: absolute;
         left: 50%;
         top: 50%;
-        transform: translate(-50%, -50%) rotate(-20deg);
+        transform: translate(-50%, -50%);
         pointer-events: none;
         user-select: none;
         -webkit-user-select: none;

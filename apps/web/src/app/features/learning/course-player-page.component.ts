@@ -139,12 +139,12 @@ import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
                       [initialPage]="pdfInitialPage()"
                       [pageStart]="chapterStart(lesson)"
                       [pageEnd]="chapterEnd(lesson)"
-                      [forwardLocked]="!pageEngine.forwardUnlocked()"
-                      [lockTooltip]="pageLockTooltip"
+                      [forwardLocked]="false"
+                      [lockTooltip]="''"
                       [learningPageLabel]="fullscreenPageLabel()"
-                      [learningTimerLabel]="pageEngine.timerLabel()"
-                      [learningPaused]="pageEngine.paused() || protection.forcePaused()"
-                      [learningComplete]="pageEngine.forwardUnlocked()"
+                      [learningTimerLabel]="''"
+                      [learningPaused]="false"
+                      [learningComplete]="true"
                       (pageChange)="onPdfPage($event)"
                       (pageLoaded)="onPdfPageLoaded($event)"
                       (scrollChange)="onPdfScroll($event)"
@@ -157,7 +157,7 @@ import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
                       [startAt]="videoStartAt()"
                       [learningPageLabel]="displayLessonTitle(lesson)"
                       [learningTimerLabel]="videoWatchLabel()"
-                      [learningPaused]="tabHidden() || protection.forcePaused()"
+                      [learningPaused]="false"
                       [learningComplete]="(currentProgress()?.watchPercentage ?? 0) >= (payload()?.videoCompletionPercent ?? 90)"
                       (play)="onVideoPlay($event)"
                       (pause)="onVideoPause($event)"
@@ -289,25 +289,6 @@ import type { QuizSubmitResult } from '../../core/http/quiz-api.service';
         </div>
 
         <footer class="player-bottom">
-          @if (activeLesson()?.type === 'PDF') {
-            <div class="reading-timer" [class.paused]="pageEngine.paused()">
-              <div class="timer-meta">
-                Page {{ pdfRelativePage() }} of {{ pdfChapterTotal() || '…' }}
-                <span class="sep">·</span>
-                Reading Timer
-                @if (pageEngine.paused()) {
-                  <span class="paused-badge">Paused</span>
-                }
-              </div>
-              <div class="timer-value" [attr.title]="pageLockTooltip">
-                {{ pageEngine.timerLabel() }} remaining
-              </div>
-              <div class="timer-bar" aria-hidden="true">
-                <span [style.width.%]="pageEngine.progressPercent()"></span>
-              </div>
-            </div>
-          }
-
           <div class="player-nav-row">
             <div class="nav-group">
               <p-button
@@ -898,7 +879,7 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
   readonly payload = signal<PlayerPayload | null>(null);
   readonly activeLessonId = signal<string | null>(null);
   readonly progressMap = signal<Record<string, LessonProgressDto>>({});
-  readonly outlineOpen = signal(false);
+  readonly outlineOpen = signal(true);
   readonly outlineOverlay = signal(false);
   readonly pdfCanPrev = signal(false);
   readonly pdfCanNext = signal(false);
@@ -969,7 +950,14 @@ export class CoursePlayerPageComponent implements OnInit, OnDestroy {
         this.payload.set(data);
         this.syncProgress(data.progress);
         this.syncPageProgress(data.pageProgress ?? []);
-        this.activeLessonId.set(data.resumeLessonId || data.lessons[0]?.id || null);
+        const requestedLessonId = this.route.snapshot.queryParamMap.get('lessonId');
+        const requested =
+          requestedLessonId && data.lessons.some((l) => l.id === requestedLessonId)
+            ? requestedLessonId
+            : null;
+        this.activeLessonId.set(
+          requested || data.resumeLessonId || data.lessons[0]?.id || null,
+        );
         if (this.activeLessonId()) {
           this.captureVideoStartAt(this.activeLessonId()!);
           this.tracker.track('LESSON_OPENED', this.activeLessonId()!);

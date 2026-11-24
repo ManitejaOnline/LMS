@@ -45,7 +45,7 @@ export class PdfPageReadingEngine implements OnDestroy {
     optional: true,
   });
 
-  readonly requiredSeconds = signal(60);
+  readonly requiredSeconds = signal(0);
   readonly pageNumber = signal(1);
   readonly completedSeconds = signal(0);
   readonly pageLoaded = signal(false);
@@ -62,9 +62,7 @@ export class PdfPageReadingEngine implements OnDestroy {
     Math.max(0, this.requiredSeconds() - this.completedSeconds()),
   );
 
-  readonly forwardUnlocked = computed(
-    () => this.completed() || this.remainingSeconds() <= 0,
-  );
+  readonly forwardUnlocked = computed(() => true);
 
   readonly timerLabel = computed(() => {
     const rem = this.remainingSeconds();
@@ -133,7 +131,7 @@ export class PdfPageReadingEngine implements OnDestroy {
     this.lessonId = opts.lessonId;
     this.pageStart = opts.pageStart;
     this.pageEnd = opts.pageEnd;
-    this.requiredSeconds.set(opts.requiredSeconds ?? 60);
+    this.requiredSeconds.set(0);
     this.byPage = new Map((opts.pages ?? []).map((p) => [p.pageNumber, p]));
     this.pageLoaded.set(false);
     this.pendingActiveSec = 0;

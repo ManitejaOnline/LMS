@@ -8,9 +8,7 @@ import { LoadingStateComponent } from '../../shared/components/loading-state/loa
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import {
-  currentProgramLevel,
   levelEyebrow,
-  levelLabel,
   levelRoute,
 } from '../../shared/utils/program-progress.util';
 
@@ -39,9 +37,6 @@ import {
           <div>
             <p class="progress-label">Overall Progress</p>
             <p class="progress-copy">{{ prog.completedCourses }} / {{ prog.totalCourses }} Courses Completed</p>
-            @if (currentLevel(prog); as current) {
-              <p class="muted">Current: {{ levelLabel(current) }}</p>
-            }
           </div>
           <app-status-badge [status]="prog.status" />
         </div>
@@ -61,11 +56,20 @@ import {
               <h3>{{ level.title }}</h3>
               <p class="muted">{{ levelMeta(level) }}</p>
               <p class="muted">{{ levelCounts(level) }}</p>
-              <p class="state" [class.ok]="level.completed" [class.current]="level.status === 'CURRENT'" [class.lock]="level.locked">
-                {{ levelState(level) }}
-              </p>
+              @if (level.completed) {
+                <p class="state ok">✓ Completed</p>
+              } @else if (level.locked) {
+                <p class="state lock">Locked</p>
+              }
             </div>
-            <span class="open">{{ level.locked ? 'Locked' : level.completed ? 'Review' : 'Open' }} →</span>
+            <span class="open" [class.play]="!level.locked">
+              @if (level.locked) {
+                Locked
+              } @else {
+                <i class="pi pi-play" aria-hidden="true"></i>
+                {{ level.completed ? 'Review' : 'Start' }}
+              }
+            </span>
           </a>
         }
       </div>
@@ -101,10 +105,17 @@ import {
       .bar { height: 4px; border-radius: 999px; background: var(--ctp-border); overflow: hidden; }
       .bar span { display: block; height: 100%; background: var(--ctp-primary); }
       .open {
-        display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 112px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        min-height: 44px; min-width: 112px;
         border: 1px solid var(--ctp-border); border-radius: var(--ctp-radius); font-weight: 600; font-size: 13px;
         padding: 0 12px; white-space: nowrap;
       }
+      .open.play {
+        background: var(--ctp-primary);
+        border-color: var(--ctp-primary);
+        color: #fff;
+      }
+      .open.play i { font-size: 12px; }
       @media (max-width: 720px) {
         .head, .level-card { flex-direction: column; align-items: stretch; }
         .open { width: 100%; }
@@ -120,8 +131,6 @@ export class ProgramOverviewPageComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly program = signal<ProgramProgressView | null>(null);
 
-  currentLevel = currentProgramLevel;
-  levelLabel = levelLabel;
   levelEyebrow = levelEyebrow;
   levelRoute = levelRoute;
 
@@ -149,9 +158,4 @@ export class ProgramOverviewPageComponent implements OnInit {
     return `${level.completedCourseCount} / ${level.courseCount} Completed`;
   }
 
-  levelState(level: LearnerLevelSummary): string {
-    if (level.locked) return '🔒 Locked';
-    if (level.completed) return '✓ Completed';
-    return '● Current';
-  }
 }

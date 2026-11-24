@@ -1,7 +1,7 @@
 import { Component, inject, input } from '@angular/core';
 import { ContentProtectionService } from '../../../core/content-protection/content-protection.service';
 
-/** Diagonal watermark overlay — place inside fullscreen shells so it stays visible. */
+/** Horizontal watermark overlay — place inside fullscreen shells so it stays visible. */
 @Component({
   selector: 'app-content-watermark',
   standalone: true,
@@ -10,10 +10,7 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
       <div class="wm" [class.tone-light]="tone() === 'light'" aria-hidden="true">
         @for (tile of tiles; track $index) {
           <div class="wm-tile">
-            <div>{{ wm.employeeName }}</div>
-            <div>{{ wm.employeeId }}</div>
-            <div>{{ wm.companyName }}</div>
-            <div>{{ wm.timestampLabel }}</div>
+            <div>{{ wm.employeeName }} · {{ wm.employeeId }} · {{ wm.companyName }} · {{ wm.timestampLabel }}</div>
           </div>
         }
       </div>
@@ -26,17 +23,17 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
       }
       .wm {
         position: absolute;
-        inset: -25%;
+        inset: -10%;
         z-index: 28;
         pointer-events: none;
         display: grid;
-        grid-template-columns: repeat(4, minmax(140px, 1fr));
-        grid-auto-rows: minmax(160px, auto);
-        gap: 40px 28px;
-        transform: rotate(-28deg);
-        opacity: 0.15;
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+        grid-auto-rows: minmax(120px, auto);
+        gap: 48px 32px;
+        transform: none;
+        opacity: 0.14;
         color: #0f172a;
-        font-size: clamp(11px, 1.5vw, 14px);
+        font-size: clamp(11px, 1.4vw, 13px);
         font-weight: 600;
         line-height: 1.35;
         user-select: none;
@@ -51,7 +48,7 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
       }
       @media (max-width: 720px) {
         .wm {
-          grid-template-columns: repeat(3, minmax(120px, 1fr));
+          grid-template-columns: 1fr;
           font-size: 11px;
         }
       }
@@ -61,7 +58,7 @@ import { ContentProtectionService } from '../../../core/content-protection/conte
 export class ContentWatermarkComponent {
   readonly protection = inject(ContentProtectionService);
   readonly tone = input<'dark' | 'light'>('dark');
-  readonly tiles = Array.from({ length: 48 });
+  readonly tiles = Array.from({ length: 24 });
 
   get wm() {
     return this.protection.watermark();

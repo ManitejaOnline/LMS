@@ -59,14 +59,6 @@ import { SidebarStateService } from './sidebar/sidebar-state.service';
             }
             <button
               type="button"
-              class="icon-btn"
-              [attr.aria-label]="theme.darkMode() ? 'Light mode' : 'Dark mode'"
-              (click)="theme.toggle()"
-            >
-              <i [class]="theme.darkMode() ? 'pi pi-sun' : 'pi pi-moon'" aria-hidden="true"></i>
-            </button>
-            <button
-              type="button"
               class="icon-btn notif-btn"
               aria-label="Notifications"
               (click)="toggleNotifications($event)"

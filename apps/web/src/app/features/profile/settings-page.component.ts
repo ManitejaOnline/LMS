@@ -5,8 +5,6 @@ import { Password } from 'primeng/password';
 import { Message } from 'primeng/message';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { AuthService } from '../../core/auth/auth.service';
-import { ThemeService } from '../../core/theme/theme.service';
-
 @Component({
   selector: 'app-settings-page',
   standalone: true,
@@ -15,22 +13,6 @@ import { ThemeService } from '../../core/theme/theme.service';
     <app-page-header title="Settings" subtitle="Preferences and account security." />
 
     <div class="grid">
-      <section class="ctp-card panel">
-        <h2 class="ctp-section-title">Appearance</h2>
-        <div class="row">
-          <div>
-            <div class="label">Theme</div>
-            <div class="ctp-muted">Switch between light and dark mode.</div>
-          </div>
-          <p-button
-            [label]="theme.darkMode() ? 'Use light mode' : 'Use dark mode'"
-            [outlined]="true"
-            size="small"
-            (onClick)="theme.toggle()"
-          />
-        </div>
-      </section>
-
       <section class="ctp-card panel">
         <h2 class="ctp-section-title">Change password</h2>
         @if (error()) {
@@ -83,7 +65,6 @@ import { ThemeService } from '../../core/theme/theme.service';
 export class SettingsPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
-  readonly theme = inject(ThemeService);
 
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);

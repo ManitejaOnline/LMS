@@ -150,7 +150,7 @@ type FitMode = 'width' | 'page' | 'custom';
       >
         <div class="pdf-page">
           <canvas #canvas></canvas>
-          <div class="pdf-watermark" aria-hidden="true">VEB Healthcare Private</div>
+          <div class="pdf-watermark" aria-hidden="true">VEB Healthcare</div>
         </div>
       </div>
 
@@ -245,13 +245,13 @@ type FitMode = 'width' | 'page' | 'custom';
         position: absolute;
         left: 50%;
         top: 50%;
-        transform: translate(-50%, -50%) rotate(-20deg);
+        transform: translate(-50%, -50%);
         pointer-events: none;
         user-select: none;
         -webkit-user-select: none;
         z-index: 1;
         color: #64748b;
-        opacity: 0.12;
+        opacity: 0.14;
         font-size: 16px;
         font-weight: 500;
         letter-spacing: 0.02em;

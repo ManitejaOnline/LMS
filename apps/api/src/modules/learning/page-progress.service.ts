@@ -89,13 +89,16 @@ export class PageProgressService {
     });
 
     if (!row) {
+      const required = PDF_PAGE_REQUIRED_SECONDS;
       row = await this.prisma.pageProgress.create({
         data: {
           assignmentId,
           lessonId,
           userId: user.userId,
           pageNumber,
-          requiredSeconds: PDF_PAGE_REQUIRED_SECONDS,
+          requiredSeconds: required,
+          completed: required <= 0,
+          completedAt: required <= 0 ? now : null,
           startedAt: now,
           lastHeartbeatAt: now,
         },
@@ -103,10 +106,36 @@ export class PageProgressService {
       await this.writeEvent(assignmentId, lessonId, user.userId, 'PAGE_STARTED', {
         pageNumber,
       });
+      if (required <= 0) {
+        await this.writeEvent(assignmentId, lessonId, user.userId, 'PAGE_COMPLETED', {
+          pageNumber,
+        });
+        await this.tryCompletePdfLesson(assignmentId, lessonId, user.userId, lesson);
+        return this.toDto(row);
+      }
     }
 
     if (row.completed) {
       return this.toDto(row);
+    }
+
+    // Timer disabled globally — mark page complete immediately (including legacy rows).
+    if (PDF_PAGE_REQUIRED_SECONDS <= 0) {
+      const updated = await this.prisma.pageProgress.update({
+        where: { id: row.id },
+        data: {
+          requiredSeconds: 0,
+          completedSeconds: Math.max(row.completedSeconds, 0),
+          completed: true,
+          completedAt: now,
+          lastHeartbeatAt: now,
+        },
+      });
+      await this.writeEvent(assignmentId, lessonId, user.userId, 'PAGE_COMPLETED', {
+        pageNumber,
+      });
+      await this.tryCompletePdfLesson(assignmentId, lessonId, user.userId, lesson);
+      return this.toDto(updated);
     }
 
     // Rate-limit credited time
@@ -199,7 +228,7 @@ export class PageProgressService {
       );
     }
 
-    if (row.completedSeconds < row.requiredSeconds) {
+    if (row.requiredSeconds > 0 && row.completedSeconds < row.requiredSeconds) {
       throw new ForbiddenException(
         `Page ${pageNumber} requires ${row.requiredSeconds}s of active reading (have ${row.completedSeconds}s)`,
       );
@@ -233,6 +262,8 @@ export class PageProgressService {
     targetPage: number,
     pageStart: number,
   ) {
+    // Timer disabled — allow free navigation through PDF pages.
+    if (PDF_PAGE_REQUIRED_SECONDS <= 0) return;
     if (targetPage <= pageStart) return;
     const prior = await this.prisma.pageProgress.findMany({
       where: {
@@ -272,6 +303,10 @@ export class PageProgressService {
     const missing: number[] = [];
     for (let p = pageStart; p <= pageEnd; p += 1) {
       const row = byPage.get(p);
+      if (PDF_PAGE_REQUIRED_SECONDS <= 0) {
+        if (!row?.completed) missing.push(p);
+        continue;
+      }
       if (!row?.completed || row.completedSeconds < row.requiredSeconds) {
         missing.push(p);
       }

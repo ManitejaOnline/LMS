@@ -1,5 +1,5 @@
-/** Server-enforced PDF page reading requirements (compliance). */
-export const PDF_PAGE_REQUIRED_SECONDS = 60;
+/** PDF page reading timer disabled (0 = no wait / no forward lock). */
+export const PDF_PAGE_REQUIRED_SECONDS = 0;
 
 /** Video lessons complete only when watch percentage reaches this threshold. */
 export const VIDEO_COMPLETION_PERCENT = 90;

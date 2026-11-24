@@ -134,21 +134,18 @@ export class ContentProtectionService implements OnDestroy {
       if (!this.active()) return;
       if (document.hidden) {
         this.log('TAB_HIDDEN');
-        this.enterFocusPause();
-      } else {
-        this.exitFocusPause();
       }
+      // No blur / pause on tab switch or extensions
     };
 
     const onBlur = () => {
       if (!this.active()) return;
       this.log('WINDOW_BLUR');
-      this.enterFocusPause();
+      // No blur / pause on window blur
     };
 
     const onFocus = () => {
-      if (!this.active()) return;
-      this.exitFocusPause();
+      /* no-op — focus pause removed */
     };
 
     const onCopy = (e: ClipboardEvent) => {
@@ -210,15 +207,7 @@ export class ContentProtectionService implements OnDestroy {
   }
 
   private triggerScreenshotDeterrent(): void {
-    this.blurred.set(true);
     this.showToast('Screen capture is discouraged and has been logged.');
-    if (this.blurTimer) clearTimeout(this.blurTimer);
-    this.blurTimer = setTimeout(() => {
-      if (!this.forcePaused() && !this.focusPaused) {
-        this.blurred.set(false);
-      }
-      this.blurTimer = null;
-    }, 2000);
   }
 
   private isBlockedShortcut(e: KeyboardEvent): boolean {
@@ -237,24 +226,19 @@ export class ContentProtectionService implements OnDestroy {
   }
 
   private enterFocusPause(): void {
-    this.focusPaused = true;
-    this.blurred.set(true);
-    this.recomputeForcePaused();
+    /* disabled — no blur/pause on tab switch or extensions */
   }
 
   private exitFocusPause(): void {
-    if (document.hidden || !document.hasFocus()) return;
     this.focusPaused = false;
-    this.recomputeForcePaused();
-    if (!this.forcePaused() && !this.blurTimer) {
-      this.blurred.set(false);
-    }
+    this.forcePaused.set(false);
+    this.blurred.set(false);
   }
 
   private syncFocusState(): void {
-    if (document.hidden || !document.hasFocus()) {
-      this.enterFocusPause();
-    }
+    this.focusPaused = false;
+    this.forcePaused.set(false);
+    this.blurred.set(false);
   }
 
   private startClock(): void {
@@ -294,11 +278,10 @@ export class ContentProtectionService implements OnDestroy {
   }
 
   private recomputeForcePaused(): void {
-    const blocked = this.lastDevtools || this.focusPaused;
-    this.forcePaused.set(blocked);
-    if (blocked) {
-      this.blurred.set(true);
-    } else if (!this.blurTimer) {
+    // Never force-pause / blur for DevTools, tab switch, or window blur.
+    this.focusPaused = false;
+    this.forcePaused.set(false);
+    if (!this.blurTimer) {
       this.blurred.set(false);
     }
   }

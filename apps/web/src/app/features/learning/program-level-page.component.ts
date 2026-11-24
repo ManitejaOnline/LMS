@@ -71,10 +71,27 @@ import { programRoute } from '../../shared/utils/program-progress.util';
                 <ul class="lessons">
                   @for (lesson of course.lessons; track lesson.id) {
                     <li>
-                      <span class="lesson-type">{{ lessonTypeLabel(lesson) }}</span>
-                      <span class="lesson-title">{{ lesson.title }}</span>
-                      @if (lessonDuration(lesson); as duration) {
-                        <span class="lesson-duration">{{ duration }}</span>
+                      @if (!course.isLocked && course.assignmentId) {
+                        <a
+                          class="lesson-row"
+                          [routerLink]="['/app/learn', course.assignmentId]"
+                          [queryParams]="lessonParams(lesson.id)"
+                        >
+                          <span class="lesson-type">{{ lessonTypeLabel(lesson) }}</span>
+                          <span class="lesson-title">{{ lesson.title }}</span>
+                          @if (lessonDuration(lesson); as duration) {
+                            <span class="lesson-duration">{{ duration }}</span>
+                          }
+                          <i class="pi pi-play lesson-play" aria-hidden="true"></i>
+                        </a>
+                      } @else {
+                        <div class="lesson-row disabled">
+                          <span class="lesson-type">{{ lessonTypeLabel(lesson) }}</span>
+                          <span class="lesson-title">{{ lesson.title }}</span>
+                          @if (lessonDuration(lesson); as duration) {
+                            <span class="lesson-duration">{{ duration }}</span>
+                          }
+                        </div>
                       }
                     </li>
                   }
@@ -85,17 +102,14 @@ import { programRoute } from '../../shared/utils/program-progress.util';
               <p-button label="Locked" [disabled]="true" size="small" />
             } @else if (!course.assignmentId) {
               <p-button label="Unavailable" [disabled]="true" size="small" />
-            } @else if (course.completed) {
-              <a [routerLink]="['/app/learn', course.assignmentId]" [queryParams]="returnParams()" class="no-underline">
-                <p-button label="View" size="small" />
-              </a>
-            } @else if (course.status === 'IN_PROGRESS') {
-              <a [routerLink]="['/app/learn', course.assignmentId]" [queryParams]="returnParams()" class="no-underline">
-                <p-button label="Continue" size="small" />
-              </a>
             } @else {
-              <a [routerLink]="['/app/learn', course.assignmentId]" [queryParams]="returnParams()" class="no-underline">
-                <p-button label="Start" size="small" />
+              <a
+                [routerLink]="['/app/learn', course.assignmentId]"
+                [queryParams]="returnParams()"
+                class="no-underline play-wrap"
+                [attr.aria-label]="course.completed ? 'Play course' : course.status === 'IN_PROGRESS' ? 'Continue course' : 'Start course'"
+              >
+                <p-button icon="pi pi-play" size="small" [rounded]="true" />
               </a>
             }
           </article>
@@ -174,14 +188,34 @@ import { programRoute } from '../../shared/utils/program-progress.util';
         gap: 8px;
       }
       .lessons li {
+        margin: 0;
+        padding: 0;
+      }
+      .lesson-row {
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: auto 1fr auto auto;
         gap: 10px;
         align-items: center;
-        padding: 8px 10px;
+        width: 100%;
+        min-height: 48px;
+        padding: 10px 12px;
         border-radius: 8px;
         background: color-mix(in srgb, var(--ctp-border) 35%, transparent);
         font-size: 13px;
+        text-decoration: none;
+        color: inherit;
+        box-sizing: border-box;
+        cursor: pointer;
+        transition: background-color 140ms ease, border-color 140ms ease;
+        border: 1px solid transparent;
+      }
+      a.lesson-row:hover {
+        background: color-mix(in srgb, var(--ctp-primary) 10%, #fff);
+        border-color: color-mix(in srgb, var(--ctp-primary) 28%, var(--ctp-border));
+      }
+      .lesson-row.disabled {
+        cursor: default;
+        opacity: 0.75;
       }
       .lesson-type {
         font-size: 11px;
@@ -192,6 +226,15 @@ import { programRoute } from '../../shared/utils/program-progress.util';
       }
       .lesson-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .lesson-duration { color: var(--ctp-muted); white-space: nowrap; }
+      .lesson-play {
+        color: var(--ctp-primary);
+        font-size: 12px;
+      }
+      .play-wrap :host ::ng-deep .p-button,
+      :host ::ng-deep .play-wrap .p-button {
+        width: 44px;
+        min-width: 44px;
+      }
       .ok { color: #157347; font-weight: 600; }
       .final { margin-top: var(--s4); align-items: center; }
       .empty {
@@ -205,7 +248,7 @@ import { programRoute } from '../../shared/utils/program-progress.util';
       @media (max-width: 720px) {
         .courses { display: flex; flex-direction: column; }
         .course-card, .final { flex-direction: column; align-items: stretch; }
-        .lessons li { grid-template-columns: auto 1fr; }
+        .lesson-row { grid-template-columns: auto 1fr auto; }
         .lesson-duration { grid-column: 2; }
       }
     `,
@@ -275,5 +318,9 @@ export class ProgramLevelPageComponent implements OnInit {
     const view = this.detail();
     if (!view) return {};
     return { programId: view.programId, levelId: view.level.id };
+  }
+
+  lessonParams(lessonId: string) {
+    return { ...this.returnParams(), lessonId };
   }
 }

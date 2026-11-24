@@ -62,29 +62,7 @@
   color-scheme: light;
 }
 
-html.dark {
-  --ctp-primary: #8b7ac9;
-  --ctp-primary-soft: #2a2448;
-  --ctp-primary-hover: #b3a6e0;
-  --ctp-teal: #2dd4bf;
-  --ctp-success: #22c55e;
-  --ctp-success-soft: #14532d;
-  --ctp-warning: #f59e0b;
-  --ctp-warning-soft: #78350f;
-  --ctp-danger: #ef4444;
-  --ctp-danger-soft: #7f1d1d;
-  --ctp-bg: #0f172a;
-  --ctp-surface: #1e293b;
-  --ctp-border: #334155;
-  --ctp-ink: #f1f5f9;
-  --ctp-muted: #94a3b8;
-  --ctp-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --ctp-brand: var(--ctp-primary);
-  --ctp-brand-soft: var(--ctp-primary);
-  --ctp-panel: var(--ctp-surface);
-  --ctp-accent: var(--ctp-primary);
-  color-scheme: dark;
-}
+/* Dark theme removed — keep light tokens only. */
 
 *,
 *::before,
@@ -212,11 +190,6 @@ a {
   color: #b91c1c;
 }
 
-html.dark .ctp-badge--neutral {
-  background: #334155;
-  color: #e2e8f0;
-}
-
 .ctp-muted {
   color: var(--ctp-muted);
 }
@@ -283,11 +256,6 @@ html.dark .ctp-badge--neutral {
   top: 0;
   z-index: 1;
   vertical-align: middle;
-}
-
-html.dark .ctp-table-wrap th,
-html.dark .ctp-data-table th {
-  background: #0f172a;
 }
 
 .ctp-table-wrap td,
